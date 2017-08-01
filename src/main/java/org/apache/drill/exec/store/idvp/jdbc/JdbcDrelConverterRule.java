@@ -28,7 +28,7 @@ import org.apache.drill.exec.planner.logical.DrillRel;
 public class JdbcDrelConverterRule extends ConverterRule {
 
     JdbcDrelConverterRule(DrillJdbcConvention in) {
-        super(RelNode.class, in, DrillRel.DRILL_LOGICAL, "JDBC_DREL_Converter" + in.getName());
+        super(RelNode.class, in, DrillRel.DRILL_LOGICAL, "IDVP_JDBC_DREL_Converter" + in.getName());
     }
 
     @Override

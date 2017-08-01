@@ -29,7 +29,7 @@ import org.apache.drill.exec.planner.physical.Prel;
 public class JdbcPrule extends ConverterRule {
 
     JdbcPrule() {
-        super(JdbcDrel.class, DrillRel.DRILL_LOGICAL, Prel.DRILL_PHYSICAL, "JDBC_PREL_Converter");
+        super(JdbcDrel.class, DrillRel.DRILL_LOGICAL, Prel.DRILL_PHYSICAL, "IDVP_JDBC_PREL_Converter");
     }
 
     @Override
