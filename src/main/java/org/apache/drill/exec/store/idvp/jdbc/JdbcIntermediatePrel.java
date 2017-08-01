@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.store.idvp.jdbc.rules;
+package org.apache.drill.exec.store.idvp.jdbc;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -27,18 +27,17 @@ import org.apache.drill.exec.planner.physical.SinglePrel;
 import org.apache.drill.exec.planner.physical.visitor.PrelVisitor;
 import org.apache.drill.exec.planner.sql.handlers.PrelFinalizable;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
-import org.apache.drill.exec.store.idvp.jdbc.JdbcPhysicalRel;
 
 import java.io.IOException;
 import java.util.List;
 
 /**
- * Prel used to represent a JDBC Conversion within an expression tree. This Prel will replaced with a full JdbcPhysicalRel
+ * Prel used to represent a JDBC Conversion within an expression tree. This Prel will replaced with a full JdbcPrel
  * before execution can happen.
  */
-public class JdbcIntermediatePhysicalRel extends SinglePrel implements PrelFinalizable {
+public class JdbcIntermediatePrel extends SinglePrel implements PrelFinalizable {
 
-    JdbcIntermediatePhysicalRel(RelOptCluster cluster, RelTraitSet traits, RelNode child) {
+    JdbcIntermediatePrel(RelOptCluster cluster, RelTraitSet traits, RelNode child) {
         super(cluster, traits, child);
     }
 
@@ -49,7 +48,7 @@ public class JdbcIntermediatePhysicalRel extends SinglePrel implements PrelFinal
 
     @Override
     public RelNode copy(RelTraitSet traitSet, List<RelNode> inputs) {
-        return new JdbcIntermediatePhysicalRel(getCluster(), traitSet, getInput());
+        return new JdbcIntermediatePrel(getCluster(), traitSet, getInput());
     }
 
     @SuppressWarnings("MethodDoesntCallSuperMethod")
@@ -65,7 +64,7 @@ public class JdbcIntermediatePhysicalRel extends SinglePrel implements PrelFinal
 
     @Override
     public Prel finalizeRel() {
-        return new JdbcPhysicalRel(getCluster(), getTraitSet(), this);
+        return new JdbcPrel(getCluster(), getTraitSet(), this);
     }
 
     @Override

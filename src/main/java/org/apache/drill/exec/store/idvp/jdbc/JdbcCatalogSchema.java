@@ -23,6 +23,10 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Table;
 import org.apache.drill.exec.store.AbstractSchema;
 
+/**
+ * @author Oleg Zinoviev
+ * @since 01.08.2017.
+ */
 class JdbcCatalogSchema extends AbstractSchema {
 
     private final JdbcStoragePlugin plugin;

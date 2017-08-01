@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.store.idvp.jdbc.rules;
+package org.apache.drill.exec.store.idvp.jdbc;
 
 import com.google.common.collect.ImmutableSet;
 import org.apache.calcite.adapter.jdbc.JdbcConvention;
@@ -26,35 +26,34 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
 import org.apache.calcite.rel.rules.ProjectRemoveRule;
 import org.apache.calcite.sql.SqlDialect;
-import org.apache.drill.exec.store.idvp.jdbc.JdbcStoragePlugin;
 
 import java.util.Set;
 
-
+/**
+ * @author Oleg Zinoviev
+ * @since 01.08.2017.
+ */
 public class DrillJdbcConvention extends JdbcConvention {
 
-    private JdbcStoragePlugin jdbcStoragePlugin;
-    private final ImmutableSet<RelOptRule> rules;
-
+    private static final JdbcPrule JDBC_PRULE_INSTANCE = new JdbcPrule();
     // Rules from Calcite's JdbcRules class that we want to avoid using.
     private static String[] RULES_TO_AVOID = {
-            "JdbcToEnumerableConverterRule",
-            "JdbcFilterRule",
-            "JdbcProjectRule"
+            "JdbcToEnumerableConverterRule", "JdbcFilterRule", "JdbcProjectRule"
     };
 
-    private static final JdbcPhysicalRule JDBC_PRULE_INSTANCE = new JdbcPhysicalRule();
+    private JdbcStoragePlugin plugin;
+    private final ImmutableSet<RelOptRule> rules;
 
-    public DrillJdbcConvention(JdbcStoragePlugin jdbcStoragePlugin, SqlDialect dialect, String name) {
+    DrillJdbcConvention(JdbcStoragePlugin plugin, SqlDialect dialect, String name) {
         super(dialect, ConstantUntypedNull.INSTANCE, name);
-        this.jdbcStoragePlugin = jdbcStoragePlugin;
+        this.plugin = plugin;
 
 
         // build rules for this convention.
         ImmutableSet.Builder<RelOptRule> builder = ImmutableSet.builder();
 
         builder.add(JDBC_PRULE_INSTANCE);
-        builder.add(new JdbcDrillRelConverterRule(this));
+        builder.add(new JdbcDrelConverterRule(this));
         builder.add(new DrillJdbcRuleBase.DrillJdbcProjectRule(this));
         builder.add(new DrillJdbcRuleBase.DrillJdbcFilterRule(this));
 
@@ -87,11 +86,11 @@ public class DrillJdbcConvention extends JdbcConvention {
         }
     }
 
-    public Set<RelOptRule> getRules() {
+    Set<RelOptRule> getRules() {
         return rules;
     }
 
-    public JdbcStoragePlugin getPlugin() {
-        return jdbcStoragePlugin;
+    JdbcStoragePlugin getPlugin() {
+        return plugin;
     }
 }

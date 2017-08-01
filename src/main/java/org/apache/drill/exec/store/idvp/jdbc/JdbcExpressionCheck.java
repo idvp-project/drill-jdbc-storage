@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.store.idvp.jdbc.rules;
+package org.apache.drill.exec.store.idvp.jdbc;
 
 import org.apache.calcite.rex.*;
 import org.apache.drill.exec.planner.sql.DrillSqlOperator;

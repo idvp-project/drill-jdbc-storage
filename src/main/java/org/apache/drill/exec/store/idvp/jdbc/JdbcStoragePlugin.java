@@ -17,8 +17,12 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
+import org.apache.calcite.adapter.jdbc.JdbcRules.JdbcJoin;
 import org.apache.calcite.adapter.jdbc.JdbcSchema;
 import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.commons.dbcp.BasicDataSource;
@@ -29,7 +33,6 @@ import org.apache.drill.exec.physical.base.AbstractGroupScan;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.store.AbstractStoragePlugin;
 import org.apache.drill.exec.store.SchemaConfig;
-import org.apache.drill.exec.store.idvp.jdbc.rules.DrillJdbcConvention;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -65,13 +68,54 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
         this.convention = new DrillJdbcConvention(this, dialect, name);
     }
 
+    /**
+     * Returns whether a condition is supported by {@link JdbcJoin}.
+     *
+     * <p>Corresponds to the capabilities of
+     * {@link JdbcJoin#convertConditionToSqlNode}.
+     *
+     * @param node Condition
+     * @return Whether condition is supported
+     */
+    @SuppressWarnings("unused")
+    private static boolean canJoinOnCondition(RexNode node) {
+        final List<RexNode> operands;
+        switch (node.getKind()) {
+            case AND:
+            case OR:
+                operands = ((RexCall) node).getOperands();
+                for (RexNode operand : operands) {
+                    if (!canJoinOnCondition(operand)) {
+                        return false;
+                    }
+                }
+                return true;
+
+            case EQUALS:
+            case IS_NOT_DISTINCT_FROM:
+            case NOT_EQUALS:
+            case GREATER_THAN:
+            case GREATER_THAN_OR_EQUAL:
+            case LESS_THAN:
+            case LESS_THAN_OR_EQUAL:
+                operands = ((RexCall) node).getOperands();
+                if ((operands.get(0) instanceof RexInputRef)
+                        && (operands.get(1) instanceof RexInputRef)) {
+                    return true;
+                }
+                // fall through
+
+            default:
+                return false;
+        }
+    }
+
     @Override
     public void registerSchemas(SchemaConfig config, SchemaPlus parent) {
         JdbcCatalogSchema schema = new JdbcCatalogSchema(this, name);
         SchemaPlus holder = parent.add(name, schema);
         schema.setHolder(holder);
     }
-
 
     @Override
     public JdbcStorageConfig getConfig() {
@@ -110,4 +154,5 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
     public Set<RelOptRule> getPhysicalOptimizerRules(OptimizerRulesContext context) {
         return convention.getRules();
     }
+
 }

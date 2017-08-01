@@ -28,6 +28,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * @author Oleg Zinoviev
+ * @since 01.08.2017.
+ */
 class CapitalizingJdbcSchema extends AbstractSchema {
 
     private final JdbcSchema inner;

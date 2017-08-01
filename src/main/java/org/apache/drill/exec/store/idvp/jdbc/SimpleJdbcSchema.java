@@ -24,9 +24,6 @@ import org.apache.calcite.schema.Table;
 import org.apache.calcite.sql.SqlDialect;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -58,45 +55,6 @@ public class SimpleJdbcSchema extends JdbcSchema {
     private Table loadTable(String name) {
 
         return new PublicJdbcTable(this, catalog, schema, name, TableType.TABLE);
-
-//        Connection connection = null;
-//        ResultSet resultSet = null;
-//        try {
-//            connection = this.getDataSource().getConnection();
-//            DatabaseMetaData metaData = connection.getMetaData();
-//
-//            resultSet = metaData.getTables(this.catalog, this.schema, name, new String[] { TableType.TABLE.name(), TableType.VIEW.name() });
-//            if (resultSet.next()) {
-//                String tableName = resultSet.getString(3);
-//                String catalogName = resultSet.getString(1);
-//                String schemaName = resultSet.getString(2);
-//                String tableTypeName = resultSet.getString(4);
-//                String tableTypeName2 = tableTypeName == null ? null : tableTypeName.toUpperCase().replace(' ', '_');
-//                TableType tableType = Util.enumVal(TableType.class, tableTypeName2);
-//                return new PublicJdbcTable(this, catalogName, schemaName, tableName, tableType);
-//            }
-//
-//            return null;
-//
-//
-//        } catch (SQLException e) {
-//            throw new RuntimeException("Exception while reading tables", e);
-//        } finally {
-//            close(connection, resultSet);
-//        }
     }
 
-    private static void close(Connection connection, ResultSet resultSet) {
-        try {
-            connection.close();
-        } catch (SQLException e) {
-            //do nothing
-        }
-
-        try {
-            resultSet.close();
-        } catch (SQLException e) {
-            //do nothing
-        }
-    }
 }

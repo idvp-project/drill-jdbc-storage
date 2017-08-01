@@ -19,7 +19,12 @@ package org.apache.calcite.adapter.jdbc;
 
 import org.apache.calcite.schema.Schema;
 
+/**
+ * @author Oleg Zinoviev
+ * @since 01.08.2017.
+ */
 public class PublicJdbcTable extends JdbcTable {
+
     public PublicJdbcTable(JdbcSchema jdbcSchema, String jdbcCatalogName, String jdbcSchemaName, String tableName, Schema.TableType jdbcTableType) {
         super(jdbcSchema, jdbcCatalogName, jdbcSchemaName, tableName, jdbcTableType);
     }

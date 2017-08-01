@@ -27,14 +27,13 @@ import org.apache.calcite.rel.AbstractRelNode;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.RelWriter;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.planner.physical.PhysicalPlanCreator;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.visitor.PrelVisitor;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
-import org.apache.drill.exec.store.idvp.jdbc.rules.DrillJdbcConvention;
-import org.apache.drill.exec.store.idvp.jdbc.rules.JdbcIntermediatePhysicalRel;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -43,15 +42,16 @@ import java.util.Iterator;
 /**
  * Represents a JDBC Plan once the children nodes have been rewritten into SQL.
  */
-public class JdbcPhysicalRel extends AbstractRelNode implements Prel {
+public class JdbcPrel extends AbstractRelNode implements Prel {
 
     private final String sql;
     private final double rows;
     private final DrillJdbcConvention convention;
 
-    public JdbcPhysicalRel(RelOptCluster cluster, RelTraitSet traitSet, JdbcIntermediatePhysicalRel prel) {
+    JdbcPrel(RelOptCluster cluster, RelTraitSet traitSet, JdbcIntermediatePrel prel) {
         super(cluster, traitSet);
         final RelNode input = prel.getInput();
+        //noinspection deprecation
         rows = input.getRows();
         convention = (DrillJdbcConvention) input.getTraitSet().getTrait(ConventionTraitDef.INSTANCE);
 
@@ -66,19 +66,6 @@ public class JdbcPhysicalRel extends AbstractRelNode implements Prel {
         rowType = input.getRowType();
     }
 
-    private class SubsetRemover extends RelShuttleImpl {
-
-        @Override
-        public RelNode visit(RelNode other) {
-            if (other instanceof RelSubset) {
-                return ((RelSubset) other).getBest().accept(this);
-            } else {
-                return super.visit(other);
-            }
-        }
-
-    }
-
     @Override
     public PhysicalOperator getPhysicalOperator(PhysicalPlanCreator creator) throws IOException {
         JdbcGroupScan output = new JdbcGroupScan(sql, convention.getPlugin(), rows);
@@ -88,6 +75,11 @@ public class JdbcPhysicalRel extends AbstractRelNode implements Prel {
     @Override
     public RelWriter explainTerms(RelWriter pw) {
         return super.explainTerms(pw).item("sql", sql);
+    }
+
+    @Override
+    public double estimateRowCount(RelMetadataQuery mq) {
+        return rows;
     }
 
     @SuppressWarnings("NullableProblems")
@@ -114,5 +106,18 @@ public class JdbcPhysicalRel extends AbstractRelNode implements Prel {
     @Override
     public boolean needsFinalColumnReordering() {
         return false;
+    }
+
+    private class SubsetRemover extends RelShuttleImpl {
+
+        @Override
+        public RelNode visit(RelNode other) {
+            if (other instanceof RelSubset) {
+                return ((RelSubset) other).getBest().accept(this);
+            } else {
+                return super.visit(other);
+            }
+        }
+
     }
 }

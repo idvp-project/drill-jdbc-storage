@@ -15,24 +15,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.store.idvp.jdbc.copiers;
+package org.apache.drill.exec.store.idvp.jdbc;
 
-import org.apache.drill.exec.vector.ValueVector;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.convert.ConverterRule;
+import org.apache.drill.exec.planner.logical.DrillRel;
+import org.apache.drill.exec.planner.physical.Prel;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
+/**
+ * @author Oleg Zinoviev
+ * @since 01.08.2017.
+ */
+public class JdbcPrule extends ConverterRule {
 
-public abstract class Copier<T extends ValueVector.Mutator> {
-    final int columnIndex;
-    final ResultSet result;
-    final T mutator;
-
-    Copier(int columnIndex, ResultSet result, T mutator) {
-        super();
-        this.columnIndex = columnIndex;
-        this.result = result;
-        this.mutator = mutator;
+    JdbcPrule() {
+        super(JdbcDrel.class, DrillRel.DRILL_LOGICAL, Prel.DRILL_PHYSICAL, "JDBC_PREL_Converter");
     }
 
-    public abstract void copy(int index) throws SQLException;
+    @Override
+    public RelNode convert(RelNode in) {
+
+        return new JdbcIntermediatePrel(
+                in.getCluster(),
+                in.getTraitSet().replace(getOutTrait()),
+                in.getInput(0));
+    }
+
 }

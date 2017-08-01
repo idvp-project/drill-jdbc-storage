@@ -15,27 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.store.idvp.jdbc.copiers;
+package org.apache.drill.exec.store.idvp.jdbc;
 
-import org.apache.drill.exec.vector.NullableFloat8Vector;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.convert.ConverterRule;
+import org.apache.drill.exec.planner.logical.DrillRel;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
+/**
+ * @author Oleg Zinoviev
+ * @since 01.08.2017.
+ */
+public class JdbcDrelConverterRule extends ConverterRule {
 
-
-public class Float8Copier extends Copier<NullableFloat8Vector.Mutator> {
-
-    public Float8Copier(int columnIndex, ResultSet result, NullableFloat8Vector.Mutator mutator) {
-        super(columnIndex, result, mutator);
+    JdbcDrelConverterRule(DrillJdbcConvention in) {
+        super(RelNode.class, in, DrillRel.DRILL_LOGICAL, "JDBC_DREL_Converter" + in.getName());
     }
 
     @Override
-    public void copy(int index) throws SQLException {
-        mutator.setSafe(index, result.getDouble(columnIndex));
-        if (result.wasNull()) {
-            mutator.setNull(index);
-        }
-
+    public RelNode convert(RelNode in) {
+        return new JdbcDrel(in.getCluster(), in.getTraitSet().replace(DrillRel.DRILL_LOGICAL),
+                convert(in, in.getTraitSet().replace(this.getInTrait())));
     }
 
 }

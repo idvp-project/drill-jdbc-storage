@@ -94,6 +94,11 @@ public class JdbcGroupScan extends AbstractGroupScan {
     }
 
     @JsonProperty
+    public double getRows() {
+        return rows;
+    }
+
+    @JsonProperty
     public StoragePluginConfig getConfig() {
         return plugin.getConfig();
     }

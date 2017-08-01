@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.apache.drill.common.AutoCloseables;
@@ -31,33 +32,21 @@ import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.store.AbstractRecordReader;
-import org.apache.drill.exec.store.idvp.jdbc.copiers.*;
 import org.apache.drill.exec.vector.*;
 
 import javax.sql.DataSource;
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.sql.*;
+import java.util.Calendar;
+import java.util.TimeZone;
 
 @SuppressWarnings("unchecked")
-public class JdbcRecordReader extends AbstractRecordReader {
+class JdbcRecordReader extends AbstractRecordReader {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory
             .getLogger(JdbcRecordReader.class);
 
     private static final ImmutableMap<Integer, MinorType> JDBC_TYPE_MAPPINGS;
-    private final DataSource source;
-    private ResultSet resultSet;
-    private final String storagePluginName;
-    private Connection connection;
-    private Statement statement;
-    private final String sql;
-    private ImmutableList<ValueVector> vectors;
-    private ImmutableList<Copier<?>> copiers;
-
-    JdbcRecordReader(DataSource source, String sql, String storagePluginName) {
-        this.source = source;
-        this.sql = sql;
-        this.storagePluginName = storagePluginName;
-    }
 
     static {
         JDBC_TYPE_MAPPINGS = (ImmutableMap<Integer, MinorType>) (Object) ImmutableMap.builder()
@@ -96,6 +85,21 @@ public class JdbcRecordReader extends AbstractRecordReader {
                 .build();
     }
 
+    private final DataSource source;
+    private final String storagePluginName;
+    private final String sql;
+    private ResultSet resultSet;
+    private Connection connection;
+    private Statement statement;
+    private ImmutableList<ValueVector> vectors;
+    private ImmutableList<Copier<?>> copiers;
+
+    JdbcRecordReader(DataSource source, String sql, String storagePluginName) {
+        this.source = source;
+        this.sql = sql;
+        this.storagePluginName = storagePluginName;
+    }
+
     private static String nameFromType(int javaSqlType) {
         try {
             for (Field f : java.sql.Types.class.getFields()) {
@@ -125,7 +129,7 @@ public class JdbcRecordReader extends AbstractRecordReader {
         } else if (v instanceof NullableIntVector) {
             return new IntCopier(offset, result, (NullableIntVector.Mutator) v.getMutator());
         } else if (v instanceof NullableVarCharVector) {
-            return new VarCharCopier(resultSet, offset, result, (NullableVarCharVector.Mutator) v.getMutator());
+            return new VarCharCopier(offset, result, (NullableVarCharVector.Mutator) v.getMutator());
         } else if (v instanceof NullableVarBinaryVector) {
             return new VarBinaryCopier(offset, result, (NullableVarBinaryVector.Mutator) v.getMutator());
         } else if (v instanceof NullableDateVector) {
@@ -177,7 +181,8 @@ public class JdbcRecordReader extends AbstractRecordReader {
 
                 final MajorType type = Types.optional(minorType);
                 final MaterializedField field = MaterializedField.create(name, type);
-                final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(minorType, type.getMode());
+                final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(
+                        minorType, type.getMode());
                 ValueVector vector = output.addField(field, clazz);
                 vectorBuilder.add(vector);
                 copierBuilder.add(getCopier(i, resultSet, vector));
@@ -200,13 +205,14 @@ public class JdbcRecordReader extends AbstractRecordReader {
     @Override
     public int next() {
         int counter = 0;
+        boolean b;
         try {
             while (counter < 4095) { // loop at 4095 since nullables use one more than record count and we
                 // allocate on powers of two.
-                if (!resultSet.next()) {
+                b = resultSet.next();
+                if (!b) {
                     break;
                 }
-
                 for (Copier<?> c : copiers) {
                     c.copy(counter);
                 }
@@ -233,5 +239,205 @@ public class JdbcRecordReader extends AbstractRecordReader {
         AutoCloseables.close(resultSet, statement, connection);
     }
 
+    private abstract class Copier<T extends ValueVector.Mutator> {
+        final int columnIndex;
+        final ResultSet result;
+        final T mutator;
+
+        Copier(int columnIndex, ResultSet result, T mutator) {
+            super();
+            this.columnIndex = columnIndex;
+            this.result = result;
+            this.mutator = mutator;
+        }
+
+        abstract void copy(int index) throws SQLException;
+    }
+
+    private class IntCopier extends Copier<NullableIntVector.Mutator> {
+        IntCopier(int offset, ResultSet set, NullableIntVector.Mutator mutator) {
+            super(offset, set, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            mutator.setSafe(index, result.getInt(columnIndex));
+            if (result.wasNull()) {
+                mutator.setNull(index);
+            }
+        }
+    }
+
+    private class BigIntCopier extends Copier<NullableBigIntVector.Mutator> {
+        BigIntCopier(int offset, ResultSet set, NullableBigIntVector.Mutator mutator) {
+            super(offset, set, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            mutator.setSafe(index, result.getLong(columnIndex));
+            if (result.wasNull()) {
+                mutator.setNull(index);
+            }
+        }
+
+    }
+
+    private class Float4Copier extends Copier<NullableFloat4Vector.Mutator> {
+
+        Float4Copier(int columnIndex, ResultSet result, NullableFloat4Vector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            mutator.setSafe(index, result.getFloat(columnIndex));
+            if (result.wasNull()) {
+                mutator.setNull(index);
+            }
+        }
+
+    }
+
+
+    private class Float8Copier extends Copier<NullableFloat8Vector.Mutator> {
+
+        Float8Copier(int columnIndex, ResultSet result, NullableFloat8Vector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            mutator.setSafe(index, result.getDouble(columnIndex));
+            if (result.wasNull()) {
+                mutator.setNull(index);
+            }
+
+        }
+
+    }
+
+    @SuppressWarnings("unused")
+    private class DecimalCopier extends Copier<NullableFloat8Vector.Mutator> {
+
+        public DecimalCopier(int columnIndex, ResultSet result, NullableFloat8Vector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            BigDecimal decimal = result.getBigDecimal(columnIndex);
+            if (decimal != null) {
+                mutator.setSafe(index, decimal.doubleValue());
+            }
+        }
+
+    }
+
+    private class VarCharCopier extends Copier<NullableVarCharVector.Mutator> {
+
+        VarCharCopier(int columnIndex, ResultSet result, NullableVarCharVector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            String val = resultSet.getString(columnIndex);
+            if (val != null) {
+                byte[] record = val.getBytes(Charsets.UTF_8);
+                mutator.setSafe(index, record, 0, record.length);
+            }
+        }
+
+    }
+
+    private class VarBinaryCopier extends Copier<NullableVarBinaryVector.Mutator> {
+
+        VarBinaryCopier(int columnIndex, ResultSet result, NullableVarBinaryVector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            byte[] record = result.getBytes(columnIndex);
+            if (record != null) {
+                mutator.setSafe(index, record, 0, record.length);
+            }
+        }
+
+    }
+
+    private class DateCopier extends Copier<NullableDateVector.Mutator> {
+
+        private final Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+
+        DateCopier(int columnIndex, ResultSet result, NullableDateVector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            Date date = result.getDate(columnIndex, calendar);
+            if (date != null) {
+                mutator.setSafe(index, date.getTime());
+            }
+        }
+
+    }
+
+    private class TimeCopier extends Copier<NullableTimeVector.Mutator> {
+
+        private final Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+
+        TimeCopier(int columnIndex, ResultSet result, NullableTimeVector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            Time time = result.getTime(columnIndex, calendar);
+            if (time != null) {
+                mutator.setSafe(index, (int) time.getTime());
+            }
+
+        }
+
+    }
+
+
+    private class TimeStampCopier extends Copier<NullableTimeStampVector.Mutator> {
+
+        private final Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+
+        TimeStampCopier(int columnIndex, ResultSet result, NullableTimeStampVector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            Timestamp stamp = result.getTimestamp(columnIndex, calendar);
+            if (stamp != null) {
+                mutator.setSafe(index, stamp.getTime());
+            }
+
+        }
+
+    }
+
+    private class BitCopier extends Copier<NullableBitVector.Mutator> {
+
+        BitCopier(int columnIndex, ResultSet result, NullableBitVector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            mutator.setSafe(index, result.getBoolean(columnIndex) ? 1 : 0);
+            if (result.wasNull()) {
+                mutator.setNull(index);
+            }
+        }
+
+    }
 
 }
