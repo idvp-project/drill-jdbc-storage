@@ -205,14 +205,13 @@ class JdbcRecordReader extends AbstractRecordReader {
     @Override
     public int next() {
         int counter = 0;
-        boolean b;
         try {
             while (counter < 4095) { // loop at 4095 since nullables use one more than record count and we
                 // allocate on powers of two.
-                b = resultSet.next();
-                if (!b) {
+                if (!resultSet.next()) {
                     break;
                 }
+
                 for (Copier<?> c : copiers) {
                     c.copy(counter);
                 }
