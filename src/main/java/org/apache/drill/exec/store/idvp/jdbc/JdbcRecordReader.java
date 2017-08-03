@@ -39,6 +39,8 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.util.Calendar;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.TimeZone;
 
 @SuppressWarnings("unchecked")
@@ -155,11 +157,20 @@ class JdbcRecordReader extends AbstractRecordReader {
 
             final ResultSetMetaData meta = resultSet.getMetaData();
             final int columns = meta.getColumnCount();
+            Set<String> columnNames = new HashSet<>();
             ImmutableList.Builder<ValueVector> vectorBuilder = ImmutableList.builder();
             ImmutableList.Builder<Copier<?>> copierBuilder = ImmutableList.builder();
 
             for (int i = 1; i <= columns; i++) {
-                final String name = meta.getColumnLabel(i);
+                String name = meta.getColumnLabel(i);
+
+                final String baseName = name;
+                int nameIndex = 0;
+                while (columnNames.contains(name)) {
+                    name = baseName + nameIndex++;
+                }
+                columnNames.add(name);
+
                 final int jdbcType = meta.getColumnType(i);
                 MinorType minorType = JDBC_TYPE_MAPPINGS.get(jdbcType);
                 if (minorType == null) {
