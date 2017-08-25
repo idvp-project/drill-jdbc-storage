@@ -44,7 +44,7 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
     private final JdbcStorageConfig config;
     private final String name;
 
-    private DataSource source;
+    private BasicDataSource source;
     private SqlDialect dialect;
     private DrillJdbcConvention convention;
 
@@ -159,7 +159,6 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
         if (convention == null) {
             synchronized (this) {
                 if (convention == null) {
-
                     this.convention = new DrillJdbcConvention(this, getDialect(), name);
                 }
             }
@@ -180,4 +179,11 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
         return getConvention().getRules();
     }
 
+    @Override
+    public void close() throws Exception {
+        super.close();
+        if (source != null) {
+            source.close();
+        }
+    }
 }
