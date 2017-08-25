@@ -42,30 +42,16 @@ import java.util.Set;
 public class JdbcStoragePlugin extends AbstractStoragePlugin {
 
     private final JdbcStorageConfig config;
-    private final DataSource source;
     private final String name;
-    private final SqlDialect dialect;
-    private final DrillJdbcConvention convention;
+
+    private DataSource source;
+    private SqlDialect dialect;
+    private DrillJdbcConvention convention;
 
 
     public JdbcStoragePlugin(JdbcStorageConfig config, @SuppressWarnings("unused") DrillbitContext context, String name) {
         this.config = config;
         this.name = name;
-        BasicDataSource source = new BasicDataSource();
-        source.setDriverClassName(config.getDriver());
-        source.setUrl(config.getUrl());
-
-        if (config.getUsername() != null) {
-            source.setUsername(config.getUsername());
-        }
-
-        if (config.getPassword() != null) {
-            source.setPassword(config.getPassword());
-        }
-
-        this.source = source;
-        this.dialect = JdbcSchema.createDialect(source);
-        this.convention = new DrillJdbcConvention(this, dialect, name);
     }
 
     /**
@@ -132,14 +118,53 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
     }
 
     DataSource getSource() {
+
+        if (source == null) {
+            synchronized (this) {
+                if (source == null) {
+                    BasicDataSource source = new BasicDataSource();
+                    source.setDriverClassName(config.getDriver());
+                    source.setUrl(config.getUrl());
+
+                    if (config.getUsername() != null) {
+                        source.setUsername(config.getUsername());
+                    }
+
+                    if (config.getPassword() != null) {
+                        source.setPassword(config.getPassword());
+                    }
+
+                    this.source = source;
+                }
+            }
+        }
+
         return source;
+
     }
 
     SqlDialect getDialect() {
+        if (dialect == null) {
+            synchronized (this) {
+                if (dialect == null) {
+                    this.dialect = JdbcSchema.createDialect(getSource());
+                }
+            }
+        }
+
         return dialect;
     }
 
     DrillJdbcConvention getConvention() {
+        if (convention == null) {
+            synchronized (this) {
+                if (convention == null) {
+
+                    this.convention = new DrillJdbcConvention(this, getDialect(), name);
+                }
+            }
+        }
+
         return convention;
     }
 
@@ -152,7 +177,7 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
     @SuppressWarnings("deprecation")
     @Override
     public Set<RelOptRule> getPhysicalOptimizerRules(OptimizerRulesContext context) {
-        return convention.getRules();
+        return getConvention().getRules();
     }
 
 }
