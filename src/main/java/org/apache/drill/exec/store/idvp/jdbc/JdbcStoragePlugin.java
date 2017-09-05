@@ -36,6 +36,7 @@ import org.apache.drill.exec.store.SchemaConfig;
 
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -176,7 +177,12 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
     @SuppressWarnings("deprecation")
     @Override
     public Set<RelOptRule> getPhysicalOptimizerRules(OptimizerRulesContext context) {
-        return getConvention().getRules();
+        try {
+            return getConvention().getRules();
+        } catch (Exception e) {
+            logger.error("JdbcStoragePlugin.getPhysicalOptimizerRules", e);
+            return Collections.emptySet();
+        }
     }
 
     @Override
