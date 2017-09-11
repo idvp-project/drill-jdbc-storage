@@ -126,7 +126,7 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
         if (source == null) {
             synchronized (this) {
                 if (source == null) {
-                    BasicDataSource source = new BasicDataSource();
+                    BasicDataSource source = new JdbcBasicDataSource();
                     source.setDriverClassName(config.getDriver());
                     source.setUrl(config.getUrl());
 
@@ -140,14 +140,8 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
 
                     source.setMaxActive(config.getConnectionPoolSize());
                     if (config.getConnectionValidationTimeout() > 0) {
-                        String validationQuery = getByDriverClassName(config.getDriver());
-                        //noinspection ConstantConditions
-                        if (validationQuery != null) {
-                            source.setValidationQueryTimeout(config.getConnectionValidationTimeout());
-                            source.setValidationQuery(validationQuery);
-                            source.setTestOnBorrow(true);
-                        }
-
+                        source.setValidationQueryTimeout(config.getConnectionValidationTimeout());
+                        source.setTestOnBorrow(true);
                     }
                     this.source = source;
                 }
