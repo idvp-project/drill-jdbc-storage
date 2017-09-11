@@ -23,6 +23,9 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Table;
 import org.apache.drill.exec.store.AbstractSchema;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 /**
  * @author Oleg Zinoviev
  * @since 01.08.2017.
@@ -30,6 +33,7 @@ import org.apache.drill.exec.store.AbstractSchema;
 class JdbcCatalogSchema extends AbstractSchema {
 
     private final JdbcStoragePlugin plugin;
+    private final ConcurrentMap<String, DrillJdbcSchema> children = new ConcurrentHashMap<>();
 
     JdbcCatalogSchema(JdbcStoragePlugin plugin, String name) {
         super(ImmutableList.<String>of(), name);
@@ -38,7 +42,7 @@ class JdbcCatalogSchema extends AbstractSchema {
 
     void setHolder(SchemaPlus plusOfThis) {
         for (String s : getSubSchemaNames()) {
-            CapitalizingJdbcSchema inner = getSubSchema(s);
+            DrillJdbcSchema inner = getSubSchema(s);
             SchemaPlus holder = plusOfThis.add(s, inner);
             inner.setHolder(holder);
         }
@@ -50,8 +54,13 @@ class JdbcCatalogSchema extends AbstractSchema {
     }
 
     @Override
-    public CapitalizingJdbcSchema getSubSchema(String name) {
-        return new CapitalizingJdbcSchema(getSchemaPath(), name, plugin);
+    public DrillJdbcSchema getSubSchema(String name) {
+        DrillJdbcSchema subSchema = children.get(name);
+        if (subSchema == null) {
+            subSchema = new DrillJdbcSchema(getSchemaPath(), name, plugin);
+            children.putIfAbsent(name, subSchema);
+        }
+        return subSchema;
     }
 
     @Override

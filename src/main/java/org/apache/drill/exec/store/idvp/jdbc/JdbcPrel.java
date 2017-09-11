@@ -29,6 +29,7 @@ import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.sql.SqlDialect;
+import org.apache.calcite.sql.pretty.SqlPrettyWriter;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.planner.physical.PhysicalPlanCreator;
 import org.apache.drill.exec.planner.physical.Prel;
@@ -62,7 +63,15 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
                 (JavaTypeFactory) getCluster().getTypeFactory());
         final JdbcImplementor.Result result =
                 jdbcImplementor.visitChild(0, input.accept(new SubsetRemover()));
-        sql = result.asQuery().toSqlString(dialect).getSql();
+
+        SqlPrettyWriter sqlWriter = new SqlPrettyWriter(dialect);
+        sqlWriter.setSelectListItemsOnSeparateLines(false);
+        sqlWriter.setQuoteAllIdentifiers(false);
+        sqlWriter.setIndentation(0);
+
+        result.asQuery().unparse(sqlWriter, 0, 0);
+
+        sql = sqlWriter.toString();
         rowType = input.getRowType();
     }
 

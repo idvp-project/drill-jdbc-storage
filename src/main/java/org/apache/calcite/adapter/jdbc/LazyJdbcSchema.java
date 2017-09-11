@@ -15,31 +15,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.store.idvp.jdbc;
+package org.apache.calcite.adapter.jdbc;
 
-import org.apache.calcite.adapter.jdbc.JdbcConvention;
-import org.apache.calcite.adapter.jdbc.JdbcSchema;
-import org.apache.calcite.adapter.jdbc.PublicJdbcTable;
+import org.apache.calcite.rel.type.RelProtoDataType;
 import org.apache.calcite.schema.Table;
 import org.apache.calcite.sql.SqlDialect;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.sql.DataSource;
+import java.sql.DatabaseMetaData;
+import java.sql.SQLException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class SimpleJdbcSchema extends JdbcSchema {
+public class LazyJdbcSchema extends JdbcSchema {
 
     private final Map<String, Table> tables = new ConcurrentHashMap<>();
     private final String catalog;
     private final String schema;
 
-    SimpleJdbcSchema(DataSource dataSource, SqlDialect dialect, JdbcConvention convention, String catalog, String schema) {
+    public LazyJdbcSchema(DataSource dataSource, SqlDialect dialect, JdbcConvention convention, String catalog, String schema) {
         super(dataSource, dialect, convention, catalog, schema);
         this.catalog = catalog;
         this.schema = schema;
     }
-
-
 
     @Override
     public Table getTable(String name) {
@@ -53,8 +52,26 @@ public class SimpleJdbcSchema extends JdbcSchema {
     }
 
     private Table loadTable(String name) {
-
-        return new PublicJdbcTable(this, catalog, schema, name, TableType.TABLE);
+        return new JdbcTable(this, catalog, schema, name, TableType.TABLE);
     }
 
+    @Override
+    RelProtoDataType getRelDataType(DatabaseMetaData metaData,
+                                    String catalogName,
+                                    String schemaName,
+                                    String tableName) throws SQLException {
+
+        //fixme: не очень удачный подход. Лучше хранить отдельно для каждого типа БД
+        if (metaData.storesUpperCaseIdentifiers()) {
+            catalogName = StringUtils.upperCase(catalogName);
+            schemaName = StringUtils.upperCase(schemaName);
+            tableName = StringUtils.upperCase(tableName);
+        } else if (metaData.storesLowerCaseIdentifiers()) {
+            catalogName = StringUtils.lowerCase(catalogName);
+            schemaName = StringUtils.lowerCase(schemaName);
+            tableName = StringUtils.lowerCase(tableName);
+        }
+
+        return super.getRelDataType(metaData, catalogName, schemaName, tableName);
+    }
 }

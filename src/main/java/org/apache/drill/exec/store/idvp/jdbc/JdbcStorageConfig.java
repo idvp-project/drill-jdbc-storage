@@ -22,27 +22,43 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.apache.drill.common.logical.StoragePluginConfig;
 
+import java.util.Objects;
+
 @JsonTypeName(JdbcStorageConfig.NAME)
 public class JdbcStorageConfig extends StoragePluginConfig {
 
     static final String NAME = "jdbc-idvp";
+    private static final int DEFAULT_POOL_SIZE = 64;
+    private static final int DEFAULT_VALIDATION_TIMEOUT = 500;
+    private static final boolean DEFAULT_USE_STANDARD_DIALECT = false;
 
     private final String driver;
     private final String url;
     private final String username;
     private final String password;
 
+    private final int connectionPoolSize;
+    private final int connectionValidationTimeout;
+
+    private final boolean useStandardDialect;
+
     @JsonCreator
     public JdbcStorageConfig(
             @JsonProperty("driver") String driver,
             @JsonProperty("url") String url,
             @JsonProperty("username") String username,
-            @JsonProperty("password") String password) {
+            @JsonProperty("password") String password,
+            @JsonProperty("connectionPoolSize") Integer connectionPoolSize,
+            @JsonProperty("connectionValidationTimeout") Integer connectionValidationTimeout,
+            @JsonProperty("useStandardDialect") Boolean useStandardDialect) {
         super();
         this.driver = driver;
         this.url = url;
         this.username = username;
         this.password = password;
+        this.connectionPoolSize = connectionPoolSize == null ? DEFAULT_POOL_SIZE : connectionPoolSize;
+        this.connectionValidationTimeout = connectionValidationTimeout == null ? DEFAULT_VALIDATION_TIMEOUT : connectionValidationTimeout;
+        this.useStandardDialect = useStandardDialect == null ? DEFAULT_USE_STANDARD_DIALECT : useStandardDialect;
     }
 
     @JsonProperty
@@ -65,59 +81,35 @@ public class JdbcStorageConfig extends StoragePluginConfig {
         return password;
     }
 
+    @JsonProperty
+    public int getConnectionPoolSize() {
+        return connectionPoolSize;
+    }
+
+    @JsonProperty
+    public int getConnectionValidationTimeout() {
+        return connectionValidationTimeout;
+    }
+
+    @JsonProperty
+    public boolean isUseStandardDialect() {
+        return useStandardDialect;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        JdbcStorageConfig that = (JdbcStorageConfig) o;
+        return connectionPoolSize == that.connectionPoolSize &&
+                Objects.equals(driver, that.driver) &&
+                Objects.equals(url, that.url) &&
+                Objects.equals(username, that.username) &&
+                Objects.equals(password, that.password);
+    }
+
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((driver == null) ? 0 : driver.hashCode());
-        result = prime * result + ((password == null) ? 0 : password.hashCode());
-        result = prime * result + ((url == null) ? 0 : url.hashCode());
-        result = prime * result + ((username == null) ? 0 : username.hashCode());
-        return result;
+        return Objects.hash(driver, url, username, password, connectionPoolSize);
     }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        JdbcStorageConfig other = (JdbcStorageConfig) obj;
-        if (driver == null) {
-            if (other.driver != null) {
-                return false;
-            }
-        } else if (!driver.equals(other.driver)) {
-            return false;
-        }
-        if (password == null) {
-            if (other.password != null) {
-                return false;
-            }
-        } else if (!password.equals(other.password)) {
-            return false;
-        }
-        if (url == null) {
-            if (other.url != null) {
-                return false;
-            }
-        } else if (!url.equals(other.url)) {
-            return false;
-        }
-        if (username == null) {
-            if (other.username != null) {
-                return false;
-            }
-        } else if (!username.equals(other.username)) {
-            return false;
-        }
-        return true;
-    }
-
-
 }

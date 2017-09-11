@@ -26,6 +26,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.commons.dbcp.BasicDataSource;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.drill.common.JSONOptions;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.ops.OptimizerRulesContext;
@@ -36,6 +37,8 @@ import org.apache.drill.exec.store.SchemaConfig;
 
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -135,6 +138,17 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
                         source.setPassword(config.getPassword());
                     }
 
+                    source.setMaxActive(config.getConnectionPoolSize());
+                    if (config.getConnectionValidationTimeout() > 0) {
+                        String validationQuery = getByDriverClassName(config.getDriver());
+                        //noinspection ConstantConditions
+                        if (validationQuery != null) {
+                            source.setValidationQueryTimeout(config.getConnectionValidationTimeout());
+                            source.setValidationQuery(validationQuery);
+                            source.setTestOnBorrow(true);
+                        }
+
+                    }
                     this.source = source;
                 }
             }
@@ -144,11 +158,27 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
 
     }
 
+    private String getByDriverClassName(String driver) {
+        if (StringUtils.equalsIgnoreCase("oracle.jdbc.OracleDriver", driver)) {
+            return "SELECT 1 FROM dual";
+        }
+
+        return "SELECT 1";
+    }
+
     SqlDialect getDialect() {
         if (dialect == null) {
             synchronized (this) {
                 if (dialect == null) {
-                    this.dialect = JdbcSchema.createDialect(getSource());
+                    if (!config.isUseStandardDialect()) {
+                        try (Connection connection = getSource().getConnection()) {
+                            this.dialect = JdbcSqlDialect.create(connection.getMetaData());
+                        } catch (SQLException e) {
+                            throw new IllegalStateException("Cannot connect to database", e);
+                        }
+                    } else {
+                        this.dialect = JdbcSchema.createDialect(getSource());
+                    }
                 }
             }
         }

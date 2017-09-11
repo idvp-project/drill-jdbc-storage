@@ -19,6 +19,7 @@ package org.apache.drill.exec.store.idvp.jdbc;
 
 import com.google.common.base.Joiner;
 import org.apache.calcite.adapter.jdbc.JdbcSchema;
+import org.apache.calcite.adapter.jdbc.LazyJdbcSchema;
 import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Table;
@@ -27,19 +28,22 @@ import org.apache.drill.exec.store.AbstractSchema;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * @author Oleg Zinoviev
  * @since 01.08.2017.
  */
-class CapitalizingJdbcSchema extends AbstractSchema {
+class DrillJdbcSchema extends AbstractSchema {
 
     private final JdbcSchema inner;
     private final JdbcStoragePlugin plugin;
+    private final ConcurrentMap<String, DrillJdbcSchema> children = new ConcurrentHashMap<>();
 
-    CapitalizingJdbcSchema(List<String> parentSchemaPath,
-                           String name,
-                           JdbcStoragePlugin plugin) {
+    DrillJdbcSchema(List<String> parentSchemaPath,
+                    String name,
+                    JdbcStoragePlugin plugin) {
         super(parentSchemaPath, name);
         this.plugin = plugin;
         String catalog = null;
@@ -54,7 +58,7 @@ class CapitalizingJdbcSchema extends AbstractSchema {
             schema = getSchemaPath().get(2);
         }
 
-        inner = new SimpleJdbcSchema(plugin.getSource(), plugin.getDialect(), plugin.getConvention(), catalog, schema);
+        inner = new LazyJdbcSchema(plugin.getSource(), plugin.getDialect(), plugin.getConvention(), catalog, schema);
     }
 
     @Override
@@ -72,13 +76,19 @@ class CapitalizingJdbcSchema extends AbstractSchema {
         return inner.getFunctionNames();
     }
 
-    public CapitalizingJdbcSchema getSubSchema(String name) {
-        return new CapitalizingJdbcSchema(getSchemaPath(), name, plugin);
+    @Override
+    public DrillJdbcSchema getSubSchema(String name) {
+        DrillJdbcSchema subSchema = children.get(name);
+        if (subSchema == null) {
+            subSchema = new DrillJdbcSchema(getSchemaPath(), name, plugin);
+            children.putIfAbsent(name, subSchema);
+        }
+        return subSchema;
     }
 
     void setHolder(SchemaPlus plusOfThis) {
         for (String s : getSubSchemaNames()) {
-            CapitalizingJdbcSchema inner = getSubSchema(s);
+            DrillJdbcSchema inner = getSubSchema(s);
             SchemaPlus holder = plusOfThis.add(s, inner);
             inner.setHolder(holder);
         }
