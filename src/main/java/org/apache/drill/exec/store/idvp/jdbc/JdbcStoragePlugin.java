@@ -141,8 +141,18 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
                     source.setMaxActive(config.getConnectionPoolSize());
                     if (config.getConnectionValidationTimeout() > 0) {
                         int timeoutInSeconds = Math.max(config.getConnectionValidationTimeout() / 1000, 1);
+
                         source.setValidationQueryTimeout(timeoutInSeconds);
                         source.setTestOnBorrow(true);
+                        source.setTestWhileIdle(true);
+                    }
+
+                    if (config.getConnectionEvictionPeriod() > 0
+                            && config.getConnectionValidationTimeout() > 0) {
+                        source.setTimeBetweenEvictionRunsMillis(config.getConnectionEvictionPeriod());
+                        source.setMinEvictableIdleTimeMillis(config.getConnectionEvictionTimeout());
+                        source.setNumTestsPerEvictionRun(source.getMaxIdle());
+                        source.setTestWhileIdle(true);
                     }
                     this.source = source;
                 }
@@ -151,14 +161,6 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
 
         return source;
 
-    }
-
-    private String getByDriverClassName(String driver) {
-        if (StringUtils.equalsIgnoreCase("oracle.jdbc.OracleDriver", driver)) {
-            return "SELECT 1 FROM dual";
-        }
-
-        return "SELECT 1";
     }
 
     SqlDialect getDialect() {

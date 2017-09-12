@@ -18,10 +18,16 @@
 package org.apache.drill.exec.store.idvp.jdbc;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import org.apache.drill.common.logical.StoragePluginConfig;
 
+import java.io.IOException;
 import java.util.Objects;
 
 @JsonTypeName(JdbcStorageConfig.NAME)
@@ -31,6 +37,8 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     private static final int DEFAULT_POOL_SIZE = 64;
     private static final int DEFAULT_VALIDATION_TIMEOUT = 500;
     private static final boolean DEFAULT_USE_STANDARD_DIALECT = false;
+    private static final int DEFAULT_EVICTION_PERIOD = 20000;
+    private static final int DEFAULT_EVICTION_TIMEOUT = 30000;
 
     private final String driver;
     private final String url;
@@ -38,9 +46,26 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     private final String password;
 
     private final int connectionPoolSize;
+    private final int connectionEvictionTimeout;
+    private final int connectionEvictionPeriod;
     private final int connectionValidationTimeout;
 
     private final boolean useStandardDialect;
+
+
+    //Конструктор для Jackson mapper. Создает объект со значениями свойств по-умолчанию
+    @SuppressWarnings("unused")
+    public JdbcStorageConfig() {
+        this(null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+    }
 
     @JsonCreator
     public JdbcStorageConfig(
@@ -49,6 +74,8 @@ public class JdbcStorageConfig extends StoragePluginConfig {
             @JsonProperty("username") String username,
             @JsonProperty("password") String password,
             @JsonProperty("connectionPoolSize") Integer connectionPoolSize,
+            @JsonProperty("connectionEvictionTimeout") Integer connectionEvictionTimeout,
+            @JsonProperty("connectionEvictionPeriod") Integer connectionEvictionPeriod,
             @JsonProperty("connectionValidationTimeout") Integer connectionValidationTimeout,
             @JsonProperty("useStandardDialect") Boolean useStandardDialect) {
         super();
@@ -59,6 +86,8 @@ public class JdbcStorageConfig extends StoragePluginConfig {
         this.connectionPoolSize = connectionPoolSize == null ? DEFAULT_POOL_SIZE : connectionPoolSize;
         this.connectionValidationTimeout = connectionValidationTimeout == null ? DEFAULT_VALIDATION_TIMEOUT : connectionValidationTimeout;
         this.useStandardDialect = useStandardDialect == null ? DEFAULT_USE_STANDARD_DIALECT : useStandardDialect;
+        this.connectionEvictionTimeout = connectionEvictionTimeout == null ? DEFAULT_EVICTION_TIMEOUT : connectionEvictionTimeout;
+        this.connectionEvictionPeriod = connectionEvictionPeriod == null ? DEFAULT_EVICTION_PERIOD : connectionEvictionPeriod;
     }
 
     @JsonProperty
@@ -82,16 +111,36 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     }
 
     @JsonProperty
+    @JsonSerialize(using = ConnectionPoolSizeSerializer.class)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public int getConnectionPoolSize() {
         return connectionPoolSize;
     }
 
     @JsonProperty
+    @JsonSerialize(using = ConnectionEvictionTimeoutSerializer.class)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public int getConnectionEvictionTimeout() {
+        return connectionEvictionTimeout;
+    }
+
+    @JsonProperty
+    @JsonSerialize(using = ConnectionEvictionPeriodSerializer.class)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public int getConnectionEvictionPeriod() {
+        return connectionEvictionPeriod;
+    }
+
+    @JsonProperty
+    @JsonSerialize(using = ConnectionValidationTimeoutSerializer.class)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public int getConnectionValidationTimeout() {
         return connectionValidationTimeout;
     }
 
     @JsonProperty
+    @JsonSerialize(using = UseStandardDialectSerializer.class)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public boolean isUseStandardDialect() {
         return useStandardDialect;
     }
@@ -102,6 +151,10 @@ public class JdbcStorageConfig extends StoragePluginConfig {
         if (o == null || getClass() != o.getClass()) return false;
         JdbcStorageConfig that = (JdbcStorageConfig) o;
         return connectionPoolSize == that.connectionPoolSize &&
+                connectionEvictionTimeout == that.connectionEvictionTimeout &&
+                connectionEvictionPeriod == that.connectionEvictionPeriod &&
+                connectionValidationTimeout == that.connectionValidationTimeout &&
+                useStandardDialect == that.useStandardDialect &&
                 Objects.equals(driver, that.driver) &&
                 Objects.equals(url, that.url) &&
                 Objects.equals(username, that.username) &&
@@ -110,6 +163,89 @@ public class JdbcStorageConfig extends StoragePluginConfig {
 
     @Override
     public int hashCode() {
-        return Objects.hash(driver, url, username, password, connectionPoolSize);
+        return Objects.hash(driver,
+                url,
+                username,
+                password,
+                connectionPoolSize,
+                connectionEvictionTimeout,
+                connectionEvictionPeriod,
+                connectionValidationTimeout,
+                useStandardDialect);
     }
+
+    private static abstract class IntDefaultsSerializer extends StdSerializer<Integer> {
+
+        private final int defaultValue;
+
+        IntDefaultsSerializer(int defaultValue) {
+            super(Integer.class);
+            this.defaultValue = defaultValue;
+        }
+
+        @Override
+        public boolean isEmpty(SerializerProvider provider, Integer value) {
+            return super.isEmpty(provider, value) || value == null || value == defaultValue;
+        }
+
+        @Override
+        public void serialize(Integer integer,
+                              JsonGenerator jsonGenerator,
+                              SerializerProvider serializerProvider) throws IOException {
+            jsonGenerator.writeNumber(integer);
+        }
+    }
+
+    private static abstract class BooleanDefaultsSerializer extends StdSerializer<Boolean> {
+
+        private final boolean defaultValue;
+
+        BooleanDefaultsSerializer(boolean defaultValue) {
+            super(Boolean.class);
+            this.defaultValue = defaultValue;
+        }
+
+        @Override
+        public boolean isEmpty(SerializerProvider provider, Boolean value) {
+            return super.isEmpty(provider, value) || value == null || value == defaultValue;
+        }
+
+        @Override
+        public void serialize(Boolean bool,
+                              JsonGenerator jsonGenerator,
+                              SerializerProvider serializerProvider) throws IOException {
+            jsonGenerator.writeBoolean(bool);
+        }
+    }
+
+    private final static class ConnectionPoolSizeSerializer extends IntDefaultsSerializer {
+        public ConnectionPoolSizeSerializer() {
+            super(DEFAULT_POOL_SIZE);
+        }
+    }
+
+    private final static class ConnectionEvictionTimeoutSerializer extends IntDefaultsSerializer {
+        public ConnectionEvictionTimeoutSerializer() {
+            super(DEFAULT_EVICTION_TIMEOUT);
+        }
+    }
+
+    private final static class ConnectionEvictionPeriodSerializer extends IntDefaultsSerializer {
+        public ConnectionEvictionPeriodSerializer() {
+            super(DEFAULT_EVICTION_PERIOD);
+        }
+    }
+
+    private final static class ConnectionValidationTimeoutSerializer extends IntDefaultsSerializer {
+        public ConnectionValidationTimeoutSerializer() {
+            super(DEFAULT_VALIDATION_TIMEOUT);
+        }
+    }
+
+    private final static class UseStandardDialectSerializer extends BooleanDefaultsSerializer {
+        public UseStandardDialectSerializer() {
+            super(DEFAULT_USE_STANDARD_DIALECT);
+        }
+    }
+
 }
