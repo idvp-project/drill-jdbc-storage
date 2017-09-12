@@ -22,9 +22,7 @@ import org.apache.commons.pool.KeyedObjectPoolFactory;
 import org.apache.commons.pool.impl.GenericObjectPool;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 
 /**
@@ -32,6 +30,21 @@ import java.util.List;
  * @since 11.09.2017
  **/
 public class JdbcBasicDataSource extends BasicDataSource {
+
+    @Override
+    protected ConnectionFactory createConnectionFactory() throws SQLException {
+        boolean testOnBorrow = getTestOnBorrow();
+        boolean testOnReturn = getTestOnReturn();
+        boolean testWhileIdle = getTestWhileIdle();
+
+        ConnectionFactory connectionFactory = super.createConnectionFactory();
+
+        setTestOnBorrow(testOnBorrow);
+        setTestOnReturn(testOnReturn);
+        setTestWhileIdle(testWhileIdle);
+
+        return connectionFactory;
+    }
 
     @Override
     protected void createPoolableConnectionFactory(ConnectionFactory driverConnectionFactory,

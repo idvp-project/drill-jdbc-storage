@@ -140,7 +140,8 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
 
                     source.setMaxActive(config.getConnectionPoolSize());
                     if (config.getConnectionValidationTimeout() > 0) {
-                        source.setValidationQueryTimeout(config.getConnectionValidationTimeout());
+                        int timeoutInSeconds = Math.max(config.getConnectionValidationTimeout() / 1000, 1);
+                        source.setValidationQueryTimeout(timeoutInSeconds);
                         source.setTestOnBorrow(true);
                     }
                     this.source = source;
