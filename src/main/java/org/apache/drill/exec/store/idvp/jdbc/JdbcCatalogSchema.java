@@ -18,6 +18,7 @@
 package org.apache.drill.exec.store.idvp.jdbc;
 
 import com.google.common.collect.ImmutableList;
+import org.apache.calcite.adapter.jdbc.LazyJdbcSchema;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Table;
@@ -34,10 +35,12 @@ class JdbcCatalogSchema extends AbstractSchema {
 
     private final JdbcStoragePlugin plugin;
     private final ConcurrentMap<String, DrillJdbcSchema> children = new ConcurrentHashMap<>();
+    private LazyJdbcSchema rootSchema;
 
     JdbcCatalogSchema(JdbcStoragePlugin plugin, String name) {
         super(ImmutableList.<String>of(), name);
         this.plugin = plugin;
+
     }
 
     void setHolder(SchemaPlus plusOfThis) {
@@ -65,7 +68,7 @@ class JdbcCatalogSchema extends AbstractSchema {
 
     @Override
     public Table getTable(String name) {
-        Schema schema = getDefaultSchema();
+        Schema schema = getRootSchema();
 
         if (schema != null) {
             try {
@@ -82,5 +85,16 @@ class JdbcCatalogSchema extends AbstractSchema {
 
         // no table was found.
         return null;
+    }
+
+    private Schema getRootSchema() {
+        if (rootSchema == null) {
+            synchronized (this) {
+                if (rootSchema == null) {
+                    this.rootSchema = new LazyJdbcSchema(plugin.getSource(), plugin.getDialect(), plugin.getConvention(), null, null);
+                }
+            }
+        }
+        return rootSchema;
     }
 }
