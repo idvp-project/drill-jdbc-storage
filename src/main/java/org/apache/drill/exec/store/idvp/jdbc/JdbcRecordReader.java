@@ -28,61 +28,75 @@ import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.common.types.Types;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.expr.TypeHelper;
+import org.apache.drill.exec.expr.holders.Decimal18Holder;
+import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
+import org.apache.drill.exec.server.options.TypeValidators;
 import org.apache.drill.exec.store.AbstractRecordReader;
+import org.apache.drill.exec.util.DecimalUtility;
 import org.apache.drill.exec.vector.*;
 
 import javax.sql.DataSource;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.sql.*;
-import java.util.Calendar;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.TimeZone;
+import java.sql.Date;
+import java.util.*;
 
 @SuppressWarnings("unchecked")
 class JdbcRecordReader extends AbstractRecordReader {
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory
-            .getLogger(JdbcRecordReader.class);
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JdbcRecordReader.class);
+    private static final TypeValidators.BooleanValidator DECIMAL_ENABLED = new TypeValidators.BooleanValidator("planner.enable_decimal_data_type", false);
 
-    private static final ImmutableMap<Integer, MinorType> JDBC_TYPE_MAPPINGS;
+    private static final ImmutableMap<Integer, TypeInfo> JDBC_TYPE_MAPPINGS;
 
     static {
-        JDBC_TYPE_MAPPINGS = (ImmutableMap<Integer, MinorType>) (Object) ImmutableMap.builder()
-                .put(java.sql.Types.DOUBLE, MinorType.FLOAT8)
-                .put(java.sql.Types.FLOAT, MinorType.FLOAT4)
-                .put(java.sql.Types.TINYINT, MinorType.INT)
-                .put(java.sql.Types.SMALLINT, MinorType.INT)
-                .put(java.sql.Types.INTEGER, MinorType.INT)
-                .put(java.sql.Types.BIGINT, MinorType.BIGINT)
+        JDBC_TYPE_MAPPINGS = ImmutableMap.<Integer, TypeInfo>builder()
+                .put(java.sql.Types.TINYINT, new TypeInfo(MinorType.INT))
+                .put(java.sql.Types.SMALLINT, new TypeInfo(MinorType.INT))
+                .put(java.sql.Types.INTEGER, new TypeInfo(MinorType.INT))
+                .put(java.sql.Types.BIGINT, new TypeInfo(MinorType.BIGINT))
 
-                .put(java.sql.Types.CHAR, MinorType.VARCHAR)
-                .put(java.sql.Types.VARCHAR, MinorType.VARCHAR)
-                .put(java.sql.Types.LONGVARCHAR, MinorType.VARCHAR)
-                .put(java.sql.Types.CLOB, MinorType.VARCHAR)
+                .put(java.sql.Types.CHAR, new TypeInfo(MinorType.VARCHAR))
+                .put(java.sql.Types.VARCHAR, new TypeInfo(MinorType.VARCHAR))
+                .put(java.sql.Types.LONGVARCHAR, new TypeInfo(MinorType.VARCHAR))
+                .put(java.sql.Types.CLOB, new TypeInfo(MinorType.VARCHAR))
 
-                .put(java.sql.Types.NCHAR, MinorType.VARCHAR)
-                .put(java.sql.Types.NVARCHAR, MinorType.VARCHAR)
-                .put(java.sql.Types.LONGNVARCHAR, MinorType.VARCHAR)
+                .put(java.sql.Types.NCHAR, new TypeInfo(MinorType.VARCHAR))
+                .put(java.sql.Types.NVARCHAR, new TypeInfo(MinorType.VARCHAR))
+                .put(java.sql.Types.LONGNVARCHAR, new TypeInfo(MinorType.VARCHAR))
 
-                .put(java.sql.Types.VARBINARY, MinorType.VARBINARY)
-                .put(java.sql.Types.LONGVARBINARY, MinorType.VARBINARY)
-                .put(java.sql.Types.BLOB, MinorType.VARBINARY)
+                .put(java.sql.Types.VARBINARY, new TypeInfo(MinorType.VARBINARY))
+                .put(java.sql.Types.LONGVARBINARY, new TypeInfo(MinorType.VARBINARY))
+                .put(java.sql.Types.BLOB, new TypeInfo(MinorType.VARBINARY))
 
-                .put(java.sql.Types.NUMERIC, MinorType.FLOAT8)
-                .put(java.sql.Types.DECIMAL, MinorType.FLOAT8)
-                .put(java.sql.Types.REAL, MinorType.FLOAT8)
+                .put(java.sql.Types.NUMERIC, new TypeInfo(MinorType.DECIMAL18))
+                .put(java.sql.Types.DECIMAL, new TypeInfo(MinorType.DECIMAL18))
+                .put(java.sql.Types.REAL, new TypeInfo(MinorType.FLOAT8))
+                .put(java.sql.Types.DOUBLE, new TypeInfo(MinorType.FLOAT8))
+                .put(java.sql.Types.FLOAT, new TypeInfo(MinorType.FLOAT4))
 
-                .put(java.sql.Types.DATE, MinorType.DATE)
-                .put(java.sql.Types.TIME, MinorType.TIME)
-                .put(java.sql.Types.TIMESTAMP, MinorType.TIMESTAMP)
+                .put(java.sql.Types.DATE, new TypeInfo(MinorType.DATE))
+                .put(java.sql.Types.TIME, new TypeInfo(MinorType.TIME))
+                .put(java.sql.Types.TIMESTAMP, new TypeInfo(MinorType.TIMESTAMP))
 
-                .put(java.sql.Types.BOOLEAN, MinorType.BIT)
+                .put(java.sql.Types.BOOLEAN, new TypeInfo(MinorType.BIT))
 
-                .put(java.sql.Types.BIT, MinorType.BIT)
+                .put(java.sql.Types.BIT, new TypeInfo(MinorType.BIT))
+
+                // Потенциальный источник проблем
+                .put(java.sql.Types.OTHER, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
+                .put(java.sql.Types.ARRAY, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
+                .put(java.sql.Types.STRUCT, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
+                .put(java.sql.Types.JAVA_OBJECT, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
+                .put(java.sql.Types.REF, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
+                .put(java.sql.Types.DATALINK, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
+                .put(java.sql.Types.NULL, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
+                .put(java.sql.Types.SQLXML, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
+                .put(java.sql.Types.ROWID, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
+                .put(java.sql.Types.DISTINCT, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
 
                 .build();
     }
@@ -90,16 +104,18 @@ class JdbcRecordReader extends AbstractRecordReader {
     private final DataSource source;
     private final String storagePluginName;
     private final String sql;
+    private final boolean decimalEnabled;
     private ResultSet resultSet;
     private Connection connection;
     private Statement statement;
     private ImmutableList<ValueVector> vectors;
     private ImmutableList<Copier<?>> copiers;
 
-    JdbcRecordReader(DataSource source, String sql, String storagePluginName) {
+    JdbcRecordReader(FragmentContext context, DataSource source, String sql, String storagePluginName) {
         this.source = source;
         this.sql = sql;
         this.storagePluginName = storagePluginName;
+        this.decimalEnabled = context.getOptions().getOption(DECIMAL_ENABLED);
     }
 
     private static String nameFromType(int javaSqlType) {
@@ -120,7 +136,11 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     }
 
-    private Copier<?> getCopier(int offset, ResultSet result, ValueVector v) {
+    private Copier<?> getCopier(int offset, ResultSet result, TypeInfo typeInfo, ValueVector v) {
+
+        if (typeInfo.copierOverride != null) {
+            return typeInfo.copierOverride.create(offset, resultSet, v.getMutator());
+        }
 
         if (v instanceof NullableBigIntVector) {
             return new BigIntCopier(offset, result, (NullableBigIntVector.Mutator) v.getMutator());
@@ -142,6 +162,8 @@ class JdbcRecordReader extends AbstractRecordReader {
             return new TimeStampCopier(offset, result, (NullableTimeStampVector.Mutator) v.getMutator());
         } else if (v instanceof NullableBitVector) {
             return new BitCopier(offset, result, (NullableBitVector.Mutator) v.getMutator());
+        } else if (v instanceof NullableDecimal18Vector) {
+            return new DecimalCopier(offset, result, (NullableDecimal18Vector.Mutator) v.getMutator());
         }
 
         throw new IllegalArgumentException("Unknown how to handle vector.");
@@ -172,10 +194,9 @@ class JdbcRecordReader extends AbstractRecordReader {
                 columnNames.add(name);
 
                 final int jdbcType = meta.getColumnType(i);
-                MinorType minorType = JDBC_TYPE_MAPPINGS.get(jdbcType);
-                if (minorType == null) {
-
-                    logger.warn("Ignoring column that is unsupported.", UserException
+                TypeInfo typeInfo = JDBC_TYPE_MAPPINGS.get(jdbcType);
+                if (typeInfo == null) {
+                    throw UserException
                             .unsupportedError()
                             .message(
                                     "A column you queried has a data type that is not currently supported by the JDBC storage plugin. "
@@ -185,18 +206,19 @@ class JdbcRecordReader extends AbstractRecordReader {
                             .addContext("sql", sql)
                             .addContext("column Name", name)
                             .addContext("plugin", storagePluginName)
-                            .build(logger));
-
-                    continue;
+                            .build(logger);
                 }
 
-                final MajorType type = Types.optional(minorType);
+                if (!decimalEnabled && typeInfo.minorType == MinorType.DECIMAL18) {
+                    typeInfo = new TypeInfo(MinorType.FLOAT8);
+                }
+
+                final MajorType type = Types.optional(typeInfo.minorType);
                 final MaterializedField field = MaterializedField.create(name, type);
-                final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(
-                        minorType, type.getMode());
+                final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(typeInfo.minorType, type.getMode());
                 ValueVector vector = output.addField(field, clazz);
                 vectorBuilder.add(vector);
-                copierBuilder.add(getCopier(i, resultSet, vector));
+                copierBuilder.add(getCopier(i, resultSet, typeInfo, vector));
 
             }
 
@@ -249,7 +271,7 @@ class JdbcRecordReader extends AbstractRecordReader {
         AutoCloseables.close(resultSet, statement, connection);
     }
 
-    private abstract class Copier<T extends ValueVector.Mutator> {
+    private abstract static class Copier<T extends ValueVector.Mutator> {
         final int columnIndex;
         final ResultSet result;
         final T mutator;
@@ -264,7 +286,7 @@ class JdbcRecordReader extends AbstractRecordReader {
         abstract void copy(int index) throws SQLException;
     }
 
-    private class IntCopier extends Copier<NullableIntVector.Mutator> {
+    private static class IntCopier extends Copier<NullableIntVector.Mutator> {
         IntCopier(int offset, ResultSet set, NullableIntVector.Mutator mutator) {
             super(offset, set, mutator);
         }
@@ -278,7 +300,7 @@ class JdbcRecordReader extends AbstractRecordReader {
         }
     }
 
-    private class BigIntCopier extends Copier<NullableBigIntVector.Mutator> {
+    private static class BigIntCopier extends Copier<NullableBigIntVector.Mutator> {
         BigIntCopier(int offset, ResultSet set, NullableBigIntVector.Mutator mutator) {
             super(offset, set, mutator);
         }
@@ -293,7 +315,7 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     }
 
-    private class Float4Copier extends Copier<NullableFloat4Vector.Mutator> {
+    private static class Float4Copier extends Copier<NullableFloat4Vector.Mutator> {
 
         Float4Copier(int columnIndex, ResultSet result, NullableFloat4Vector.Mutator mutator) {
             super(columnIndex, result, mutator);
@@ -310,7 +332,7 @@ class JdbcRecordReader extends AbstractRecordReader {
     }
 
 
-    private class Float8Copier extends Copier<NullableFloat8Vector.Mutator> {
+    private static class Float8Copier extends Copier<NullableFloat8Vector.Mutator> {
 
         Float8Copier(int columnIndex, ResultSet result, NullableFloat8Vector.Mutator mutator) {
             super(columnIndex, result, mutator);
@@ -327,10 +349,9 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     }
 
-    @SuppressWarnings("unused")
-    private class DecimalCopier extends Copier<NullableFloat8Vector.Mutator> {
+    private static class DecimalCopier extends Copier<NullableDecimal18Vector.Mutator> {
 
-        public DecimalCopier(int columnIndex, ResultSet result, NullableFloat8Vector.Mutator mutator) {
+        DecimalCopier(int columnIndex, ResultSet result, NullableDecimal18Vector.Mutator mutator) {
             super(columnIndex, result, mutator);
         }
 
@@ -338,13 +359,17 @@ class JdbcRecordReader extends AbstractRecordReader {
         void copy(int index) throws SQLException {
             BigDecimal decimal = result.getBigDecimal(columnIndex);
             if (decimal != null) {
-                mutator.setSafe(index, decimal.doubleValue());
+                Decimal18Holder h = new Decimal18Holder();
+                h.precision = decimal.precision();
+                h.scale = decimal.scale();
+                h.value = DecimalUtility.getDecimal18FromBigDecimal(decimal, decimal.scale(), decimal.precision());
+                mutator.setSafe(index, h);
             }
         }
 
     }
 
-    private class VarCharCopier extends Copier<NullableVarCharVector.Mutator> {
+    private static class VarCharCopier extends Copier<NullableVarCharVector.Mutator> {
 
         VarCharCopier(int columnIndex, ResultSet result, NullableVarCharVector.Mutator mutator) {
             super(columnIndex, result, mutator);
@@ -352,7 +377,7 @@ class JdbcRecordReader extends AbstractRecordReader {
 
         @Override
         void copy(int index) throws SQLException {
-            String val = resultSet.getString(columnIndex);
+            String val = result.getString(columnIndex);
             if (val != null) {
                 byte[] record = val.getBytes(Charsets.UTF_8);
                 mutator.setSafe(index, record, 0, record.length);
@@ -361,7 +386,39 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     }
 
-    private class VarBinaryCopier extends Copier<NullableVarBinaryVector.Mutator> {
+    private static class Object2VarCharCopier extends Copier<NullableVarCharVector.Mutator> {
+
+        final static class Provider implements TypeInfo.CopierProvider {
+
+            @Override
+            public Copier<?> create(int index, ResultSet resultSet, ValueVector.Mutator mutator) {
+                return new Object2VarCharCopier(index, resultSet, (NullableVarCharVector.Mutator) mutator);
+            }
+        }
+
+
+        Object2VarCharCopier(int columnIndex, ResultSet result, NullableVarCharVector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            Object object = result.getObject(columnIndex);
+            String val = Objects.toString(object, null);
+            if (object instanceof Array) {
+                ((Array) object).free();
+            }
+            if (object instanceof SQLXML) {
+                ((SQLXML) object).free();
+            }
+            if (val != null) {
+                byte[] record = val.getBytes(Charsets.UTF_8);
+                mutator.setSafe(index, record, 0, record.length);
+            }
+        }
+    }
+
+    private static class VarBinaryCopier extends Copier<NullableVarBinaryVector.Mutator> {
 
         VarBinaryCopier(int columnIndex, ResultSet result, NullableVarBinaryVector.Mutator mutator) {
             super(columnIndex, result, mutator);
@@ -377,7 +434,7 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     }
 
-    private class DateCopier extends Copier<NullableDateVector.Mutator> {
+    private static class DateCopier extends Copier<NullableDateVector.Mutator> {
 
         private final Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
@@ -395,7 +452,7 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     }
 
-    private class TimeCopier extends Copier<NullableTimeVector.Mutator> {
+    private static class TimeCopier extends Copier<NullableTimeVector.Mutator> {
 
         private final Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
@@ -415,7 +472,7 @@ class JdbcRecordReader extends AbstractRecordReader {
     }
 
 
-    private class TimeStampCopier extends Copier<NullableTimeStampVector.Mutator> {
+    private static class TimeStampCopier extends Copier<NullableTimeStampVector.Mutator> {
 
         private final Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
@@ -434,7 +491,7 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     }
 
-    private class BitCopier extends Copier<NullableBitVector.Mutator> {
+    private static class BitCopier extends Copier<NullableBitVector.Mutator> {
 
         BitCopier(int columnIndex, ResultSet result, NullableBitVector.Mutator mutator) {
             super(columnIndex, result, mutator);
@@ -447,7 +504,24 @@ class JdbcRecordReader extends AbstractRecordReader {
                 mutator.setNull(index);
             }
         }
+    }
 
+    private final static class TypeInfo {
+        private final MinorType minorType;
+        private final CopierProvider copierOverride;
+
+        private TypeInfo(MinorType minorType, CopierProvider copierOverride) {
+            this.minorType = minorType;
+            this.copierOverride = copierOverride;
+        }
+
+        private TypeInfo(MinorType minorType) {
+            this(minorType, null);
+        }
+
+        interface CopierProvider {
+            Copier<?> create(int index, ResultSet resultSet, ValueVector.Mutator mutator);
+        }
     }
 
 }
