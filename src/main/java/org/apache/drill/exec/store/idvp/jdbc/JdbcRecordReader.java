@@ -209,8 +209,15 @@ class JdbcRecordReader extends AbstractRecordReader {
                             .build(logger);
                 }
 
-                if (!decimalEnabled && typeInfo.minorType == MinorType.DECIMAL18) {
-                    typeInfo = new TypeInfo(MinorType.FLOAT8);
+                if (typeInfo.minorType == MinorType.DECIMAL18) {
+                    if (decimalEnabled) {
+                        int precision = meta.getPrecision(i);
+                        if (precision == 0) {
+                            typeInfo = new TypeInfo(MinorType.BIGINT);
+                        }
+                    } else {
+                        typeInfo = new TypeInfo(MinorType.FLOAT8);
+                    }
                 }
 
                 final MajorType type = Types.optional(typeInfo.minorType);
