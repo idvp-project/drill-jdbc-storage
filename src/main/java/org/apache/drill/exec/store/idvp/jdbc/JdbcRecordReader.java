@@ -211,7 +211,7 @@ class JdbcRecordReader extends AbstractRecordReader {
 
                 if (typeInfo.minorType == MinorType.DECIMAL18) {
                     if (decimalEnabled) {
-                        int precision = meta.getPrecision(i);
+                        int precision = meta.getScale(i);
                         if (precision == 0) {
                             typeInfo = new TypeInfo(MinorType.BIGINT);
                         }
