@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.drill.common.AutoCloseables;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
+import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.types.TypeProtos.MajorType;
 import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.common.types.Types;
@@ -194,7 +195,7 @@ class JdbcRecordReader extends AbstractRecordReader {
                 columnNames.add(name);
 
                 final int jdbcType = meta.getColumnType(i);
-                TypeInfo typeInfo = JDBC_TYPE_MAPPINGS.get(jdbcType);
+                final TypeInfo typeInfo = JDBC_TYPE_MAPPINGS.get(jdbcType);
                 if (typeInfo == null) {
                     throw UserException
                             .unsupportedError()
@@ -209,18 +210,27 @@ class JdbcRecordReader extends AbstractRecordReader {
                             .build(logger);
                 }
 
+                final MajorType type;
                 if (typeInfo.minorType == MinorType.DECIMAL18) {
                     if (decimalEnabled) {
-                        int precision = meta.getScale(i);
-                        if (precision == 0) {
-                            typeInfo = new TypeInfo(MinorType.BIGINT);
+                        int scale = meta.getScale(i);
+                        if (scale == 0) {
+                            type = Types.optional(MinorType.BIGINT);
+                        } else {
+                            type = MajorType
+                                    .newBuilder()
+                                    .setMode(TypeProtos.DataMode.OPTIONAL)
+                                    .setMinorType(MinorType.DECIMAL18)
+                                    .setScale(scale)
+                                    .build();
                         }
                     } else {
-                        typeInfo = new TypeInfo(MinorType.FLOAT8);
+                        type = Types.optional(MinorType.FLOAT8);
                     }
+                } else {
+                    type = Types.optional(typeInfo.minorType);
                 }
 
-                final MajorType type = Types.optional(typeInfo.minorType);
                 final MaterializedField field = MaterializedField.create(name, type);
                 final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(typeInfo.minorType, type.getMode());
                 ValueVector vector = output.addField(field, clazz);
