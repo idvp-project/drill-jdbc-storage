@@ -232,7 +232,7 @@ class JdbcRecordReader extends AbstractRecordReader {
                 }
 
                 final MaterializedField field = MaterializedField.create(name, type);
-                final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(typeInfo.minorType, type.getMode());
+                final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(type.getMinorType(), type.getMode());
                 ValueVector vector = output.addField(field, clazz);
                 vectorBuilder.add(vector);
                 copierBuilder.add(getCopier(i, resultSet, typeInfo, vector));
