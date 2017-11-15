@@ -21,6 +21,7 @@ import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.apache.drill.common.AutoCloseables;
+import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.types.TypeProtos;
@@ -368,8 +369,16 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     private static class DecimalCopier extends Copier<NullableDecimal18Vector.Mutator> {
 
+        private final int scale;
+
         DecimalCopier(int columnIndex, ResultSet result, NullableDecimal18Vector.Mutator mutator) {
             super(columnIndex, result, mutator);
+
+            try {
+                scale = result.getMetaData().getScale(columnIndex);
+            } catch (SQLException e) {
+                throw new DrillRuntimeException(e);
+            }
         }
 
         @Override
@@ -378,8 +387,8 @@ class JdbcRecordReader extends AbstractRecordReader {
             if (decimal != null) {
                 Decimal18Holder h = new Decimal18Holder();
                 h.precision = decimal.precision();
-                h.scale = decimal.scale();
-                h.value = DecimalUtility.getDecimal18FromBigDecimal(decimal, decimal.scale(), decimal.precision());
+                h.scale = scale;
+                h.value = DecimalUtility.getDecimal18FromBigDecimal(decimal, scale, decimal.precision());
                 mutator.setSafe(index, h);
             }
         }
