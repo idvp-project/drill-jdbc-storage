@@ -215,14 +215,21 @@ class JdbcRecordReader extends AbstractRecordReader {
                 if (typeInfo.minorType == MinorType.DECIMAL18) {
                     if (decimalEnabled) {
                         int scale = meta.getScale(i);
-                        if (scale == 0) {
+                        if (scale <= 0) {
+                            //если scale < 0, то там заведомо только целые числа
                             type = Types.optional(MinorType.BIGINT);
                         } else {
+                            int precision = meta.getPrecision(i);
+                            if (precision <= 0) {
+                                precision = 18;
+                            }
+
                             type = MajorType
                                     .newBuilder()
                                     .setMode(TypeProtos.DataMode.OPTIONAL)
                                     .setMinorType(MinorType.DECIMAL18)
                                     .setScale(scale)
+                                    .setPrecision(precision)
                                     .build();
                         }
                     } else {
@@ -370,12 +377,20 @@ class JdbcRecordReader extends AbstractRecordReader {
     private static class DecimalCopier extends Copier<NullableDecimal18Vector.Mutator> {
 
         private final int scale;
+        private final int precision;
 
         DecimalCopier(int columnIndex, ResultSet result, NullableDecimal18Vector.Mutator mutator) {
             super(columnIndex, result, mutator);
 
             try {
                 scale = result.getMetaData().getScale(columnIndex);
+
+                int precision = result.getMetaData().getPrecision(columnIndex);
+                if (precision <= 0) {
+                    precision = 18;
+                }
+                this.precision = precision;
+
             } catch (SQLException e) {
                 throw new DrillRuntimeException(e);
             }
@@ -386,9 +401,9 @@ class JdbcRecordReader extends AbstractRecordReader {
             BigDecimal decimal = result.getBigDecimal(columnIndex);
             if (decimal != null) {
                 Decimal18Holder h = new Decimal18Holder();
-                h.precision = decimal.precision();
+                h.precision = precision;
                 h.scale = scale;
-                h.value = DecimalUtility.getDecimal18FromBigDecimal(decimal, scale, decimal.precision());
+                h.value = DecimalUtility.getDecimal18FromBigDecimal(decimal, scale, precision);
                 mutator.setSafe(index, h);
             }
         }
