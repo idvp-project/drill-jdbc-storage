@@ -57,6 +57,10 @@ public class DrillJdbcConvention extends JdbcConvention {
         builder.add(new DrillJdbcRuleBase.DrillJdbcProjectRule(this));
         builder.add(new DrillJdbcRuleBase.DrillJdbcFilterRule(this));
 
+        if (plugin.getConfig().isUseExtendedAggregatePushDown()) {
+            builder.add(new DrillJdbcRuleBase.DrillJdbcAggregateRule(this));
+        }
+
         outside:
         for (RelOptRule rule : JdbcRules.rules(this)) {
             final String description = rule.toString();

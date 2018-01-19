@@ -176,7 +176,16 @@ class JdbcRecordReader extends AbstractRecordReader {
         try {
 
             connection = source.getConnection();
-            statement = connection.createStatement();
+
+            try {
+                connection.setAutoCommit(false);
+                statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+                statement.setFetchSize(1024);
+            } catch (Exception e) {
+                logger.info("Ошибка при использовании стриминга ResultSet", e);
+                statement = connection.createStatement();
+            }
+
             resultSet = statement.executeQuery(sql);
 
             final ResultSetMetaData meta = resultSet.getMetaData();
