@@ -34,7 +34,7 @@ import org.apache.drill.exec.store.StoragePluginRegistry;
 
 import java.util.List;
 
-@JsonTypeName("jdbc-scan")
+@JsonTypeName("jdbc-idvp-scan")
 public class JdbcGroupScan extends AbstractGroupScan {
 
     private final String sql;

@@ -23,7 +23,7 @@ import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.physical.base.AbstractSubScan;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 
-@JsonTypeName("jdbc-sub-scan")
+@JsonTypeName("jdbc-idvp-sub-scan")
 public class JdbcSubScan extends AbstractSubScan {
 
     private final String sql;
