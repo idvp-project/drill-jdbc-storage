@@ -38,7 +38,7 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     private static final int DEFAULT_POOL_SIZE = 64;
     private static final int DEFAULT_VALIDATION_TIMEOUT = 500;
     private static final boolean DEFAULT_USE_STANDARD_DIALECT = false;
-    private static final boolean DEFAULT_USE_EXTENDED_AGGREGATE_PUSH_DOWN = true;
+    private static final boolean DEFAULT_USE_EXTENDED_AGGREGATE_PUSH_DOWN = false;
     private static final int DEFAULT_EVICTION_PERIOD = 20000;
     private static final int DEFAULT_EVICTION_TIMEOUT = 30000;
 
