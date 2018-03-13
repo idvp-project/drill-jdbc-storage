@@ -50,7 +50,7 @@ import java.util.*;
 @SuppressWarnings("unchecked")
 class JdbcRecordReader extends AbstractRecordReader {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JdbcRecordReader.class);
-    private static final TypeValidators.BooleanValidator DECIMAL_ENABLED = new TypeValidators.BooleanValidator("planner.enable_decimal_data_type", false);
+    private static final TypeValidators.BooleanValidator DECIMAL_ENABLED = new TypeValidators.BooleanValidator("planner.enable_decimal_data_type");
 
     private static final ImmutableMap<Integer, TypeInfo> JDBC_TYPE_MAPPINGS;
 
@@ -176,7 +176,16 @@ class JdbcRecordReader extends AbstractRecordReader {
         try {
 
             connection = source.getConnection();
-            statement = connection.createStatement();
+
+            try {
+                connection.setAutoCommit(false);
+                statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+                statement.setFetchSize(1024);
+            } catch (Exception e) {
+                logger.info("Ошибка при использовании стриминга ResultSet", e);
+                statement = connection.createStatement();
+            }
+
             resultSet = statement.executeQuery(sql);
 
             final ResultSetMetaData meta = resultSet.getMetaData();

@@ -38,6 +38,6 @@ public class JdbcBatchCreator implements BatchCreator<JdbcSubScan> {
         Preconditions.checkArgument(children.isEmpty());
         JdbcStoragePlugin plugin = config.getPlugin();
         RecordReader reader = new JdbcRecordReader(context, plugin.getSource(), config.getSql(), plugin.getName());
-        return new ScanBatch(config, context, Collections.singletonList(reader).iterator());
+        return new ScanBatch(config, context, Collections.singletonList(reader));
     }
 }

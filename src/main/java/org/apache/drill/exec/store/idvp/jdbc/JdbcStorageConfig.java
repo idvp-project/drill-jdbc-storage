@@ -30,6 +30,7 @@ import org.apache.drill.common.logical.StoragePluginConfig;
 import java.io.IOException;
 import java.util.Objects;
 
+@SuppressWarnings("WeakerAccess")
 @JsonTypeName(JdbcStorageConfig.NAME)
 public class JdbcStorageConfig extends StoragePluginConfig {
 
@@ -37,6 +38,7 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     private static final int DEFAULT_POOL_SIZE = 64;
     private static final int DEFAULT_VALIDATION_TIMEOUT = 500;
     private static final boolean DEFAULT_USE_STANDARD_DIALECT = false;
+    private static final boolean DEFAULT_USE_EXTENDED_AGGREGATE_PUSH_DOWN = false;
     private static final int DEFAULT_EVICTION_PERIOD = 20000;
     private static final int DEFAULT_EVICTION_TIMEOUT = 30000;
 
@@ -51,12 +53,14 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     private final int connectionValidationTimeout;
 
     private final boolean useStandardDialect;
+    private final boolean useExtendedAggregatePushDown;
 
 
     //Конструктор для Jackson mapper. Создает объект со значениями свойств по-умолчанию
     @SuppressWarnings("unused")
     public JdbcStorageConfig() {
         this(null,
+                null,
                 null,
                 null,
                 null,
@@ -77,7 +81,8 @@ public class JdbcStorageConfig extends StoragePluginConfig {
             @JsonProperty("connectionEvictionTimeout") Integer connectionEvictionTimeout,
             @JsonProperty("connectionEvictionPeriod") Integer connectionEvictionPeriod,
             @JsonProperty("connectionValidationTimeout") Integer connectionValidationTimeout,
-            @JsonProperty("useStandardDialect") Boolean useStandardDialect) {
+            @JsonProperty("useStandardDialect") Boolean useStandardDialect,
+            @JsonProperty("useExtendedAggregatePushDown") Boolean useExtendedAggregatePushDown) {
         super();
         this.driver = driver;
         this.url = url;
@@ -86,6 +91,7 @@ public class JdbcStorageConfig extends StoragePluginConfig {
         this.connectionPoolSize = connectionPoolSize == null ? DEFAULT_POOL_SIZE : connectionPoolSize;
         this.connectionValidationTimeout = connectionValidationTimeout == null ? DEFAULT_VALIDATION_TIMEOUT : connectionValidationTimeout;
         this.useStandardDialect = useStandardDialect == null ? DEFAULT_USE_STANDARD_DIALECT : useStandardDialect;
+        this.useExtendedAggregatePushDown = useExtendedAggregatePushDown == null ? DEFAULT_USE_EXTENDED_AGGREGATE_PUSH_DOWN : useExtendedAggregatePushDown;
         this.connectionEvictionTimeout = connectionEvictionTimeout == null ? DEFAULT_EVICTION_TIMEOUT : connectionEvictionTimeout;
         this.connectionEvictionPeriod = connectionEvictionPeriod == null ? DEFAULT_EVICTION_PERIOD : connectionEvictionPeriod;
     }
@@ -143,6 +149,13 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public boolean isUseStandardDialect() {
         return useStandardDialect;
+    }
+
+    @JsonProperty
+    @JsonSerialize(using = UseExtendedAggregatePushDownSerializer.class)
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    public boolean isUseExtendedAggregatePushDown() {
+        return useExtendedAggregatePushDown;
     }
 
     @Override
@@ -245,6 +258,12 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     private final static class UseStandardDialectSerializer extends BooleanDefaultsSerializer {
         public UseStandardDialectSerializer() {
             super(DEFAULT_USE_STANDARD_DIALECT);
+        }
+    }
+
+    private final static class UseExtendedAggregatePushDownSerializer extends BooleanDefaultsSerializer {
+        public UseExtendedAggregatePushDownSerializer() {
+            super(DEFAULT_USE_EXTENDED_AGGREGATE_PUSH_DOWN);
         }
     }
 

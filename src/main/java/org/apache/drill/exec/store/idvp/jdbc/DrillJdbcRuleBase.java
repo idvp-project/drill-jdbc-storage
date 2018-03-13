@@ -25,13 +25,21 @@ import org.apache.calcite.adapter.jdbc.JdbcRules;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTrait;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
+import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.drill.exec.planner.sql.DrillCalciteSqlAggFunctionWrapper;
 
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -114,6 +122,67 @@ abstract class DrillJdbcRuleBase extends ConverterRule {
             } catch (ExecutionException e) {
                 throw new IllegalStateException("Failure while trying to evaluate pushdown.", e);
             }
+        }
+    }
+
+    static class DrillJdbcAggregateRule extends DrillJdbcRuleBase {
+
+        DrillJdbcAggregateRule(JdbcConvention out) {
+            super(LogicalAggregate.class, Convention.NONE, out, "DrillJdbcAggregateRule");
+        }
+
+        @Override
+        public RelNode convert(RelNode rel) {
+            LogicalAggregate agg = (LogicalAggregate) rel;
+            if (agg.getGroupSets().size() != 1) {
+                return null;
+            } else {
+                List<AggregateCall> unwrappedAggregates = new ArrayList<>();
+
+                boolean hasWrappedAggregate = unwrapCall(agg, unwrappedAggregates);
+                if (hasWrappedAggregate) {
+                    RelTraitSet traitSet = agg.getTraitSet().replace(this.out);
+
+                    try {
+                        return new JdbcRules.JdbcAggregate(rel.getCluster(),
+                                traitSet,
+                                convert(agg.getInput(), this.out),
+                                agg.indicator, agg.getGroupSet(),
+                                agg.getGroupSets(),
+                                unwrappedAggregates);
+                    } catch (InvalidRelException e) {
+                        JdbcStoragePlugin.logger.debug(e.toString());
+                        return null;
+                    }
+                } else {
+                    return null; //Обрабатываем стандартным правилом
+                }
+            }
+        }
+
+        private boolean unwrapCall(LogicalAggregate agg, List<AggregateCall> unwrappedAggregates) {
+            boolean hasWrappedAggregate = false;
+            for (AggregateCall call : agg.getAggCallList()) {
+                if (call.getAggregation() instanceof DrillCalciteSqlAggFunctionWrapper) {
+                    DrillCalciteSqlAggFunctionWrapper wrapper = (DrillCalciteSqlAggFunctionWrapper) call.getAggregation();
+                    if (wrapper.getOperator() instanceof SqlAggFunction) {
+                        AggregateCall unwrappedCall = AggregateCall.create(
+                                (SqlAggFunction) wrapper.getOperator(),
+                                call.isDistinct(),
+                                call.getArgList(),
+                                call.filterArg,
+                                -1, //Параметр игнорируется, если передать type,
+                                null, //Параметр игнорируется, если передать type
+                                call.getType(),
+                                call.getName());
+                        unwrappedAggregates.add(unwrappedCall);
+                        hasWrappedAggregate = true;
+                    }
+                } else {
+                    unwrappedAggregates.add(call);
+                }
+            }
+            return hasWrappedAggregate;
         }
     }
 
