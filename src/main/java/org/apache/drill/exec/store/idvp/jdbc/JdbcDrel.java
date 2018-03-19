@@ -38,7 +38,7 @@ public class JdbcDrel extends SingleRel implements DrillRel {
     return new JdbcDrel(getCluster(), traitSet, inputs.iterator().next());
   }
 
-  @SuppressWarnings("MethodDoesntCallSuperMethod")
+  @SuppressWarnings({"MethodDoesntCallSuperMethod", "RedundantThrows"})
   @Override
   protected Object clone() throws CloneNotSupportedException {
     return copy(getTraitSet(), getInputs());

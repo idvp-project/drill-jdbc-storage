@@ -36,7 +36,6 @@ import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.visitor.PrelVisitor;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 
@@ -69,7 +68,7 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
         sqlWriter.setQuoteAllIdentifiers(false);
         sqlWriter.setIndentation(0);
 
-        result.asSelect().unparse(sqlWriter, 0, 0);
+        result.asStatement().unparse(sqlWriter, 0, 0);
 
         sql = sqlWriter.toString();
         rowType = input.getRowType();

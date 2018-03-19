@@ -23,9 +23,8 @@ import org.apache.calcite.adapter.jdbc.JdbcRules;
 import org.apache.calcite.linq4j.tree.ConstantUntypedNull;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
-import org.apache.calcite.rel.rules.ProjectRemoveRule;
 import org.apache.calcite.sql.SqlDialect;
+import org.apache.drill.exec.planner.RuleInstance;
 
 import java.util.Set;
 
@@ -77,8 +76,8 @@ public class DrillJdbcConvention extends JdbcConvention {
             builder.add(rule);
         }
 
-        builder.add(FilterSetOpTransposeRule.INSTANCE);
-        builder.add(ProjectRemoveRule.INSTANCE);
+        builder.add(RuleInstance.FILTER_SET_OP_TRANSPOSE_RULE);
+        builder.add(RuleInstance.PROJECT_REMOVE_RULE);
 
         rules = builder.build();
     }

@@ -17,9 +17,11 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
+import com.google.common.base.Predicates;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.drill.exec.planner.logical.DrillRel;
+import org.apache.drill.exec.planner.logical.DrillRelFactories;
 import org.apache.drill.exec.planner.physical.Prel;
 
 /**
@@ -29,7 +31,12 @@ import org.apache.drill.exec.planner.physical.Prel;
 public class JdbcPrule extends ConverterRule {
 
     JdbcPrule() {
-        super(JdbcDrel.class, DrillRel.DRILL_LOGICAL, Prel.DRILL_PHYSICAL, "IDVP_JDBC_PREL_Converter");
+        //noinspection Guava
+        super(JdbcDrel.class, Predicates.alwaysTrue(),
+                DrillRel.DRILL_LOGICAL,
+                Prel.DRILL_PHYSICAL,
+                DrillRelFactories.LOGICAL_BUILDER,
+                "IDVP_JDBC_PREL_Converter");
     }
 
     @Override

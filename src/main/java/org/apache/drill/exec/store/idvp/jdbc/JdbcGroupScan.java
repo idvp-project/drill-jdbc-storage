@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.logical.StoragePluginConfig;
-import org.apache.drill.exec.physical.PhysicalOperatorSetupException;
 import org.apache.drill.exec.physical.base.AbstractGroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
@@ -61,11 +60,11 @@ public class JdbcGroupScan extends AbstractGroupScan {
     }
 
     @Override
-    public void applyAssignments(List<DrillbitEndpoint> endpoints) throws PhysicalOperatorSetupException {
+    public void applyAssignments(List<DrillbitEndpoint> endpoints) {
     }
 
     @Override
-    public SubScan getSpecificScan(int minorFragmentId) throws ExecutionSetupException {
+    public SubScan getSpecificScan(int minorFragmentId) {
         return new JdbcSubScan(sql, plugin);
     }
 
@@ -104,7 +103,7 @@ public class JdbcGroupScan extends AbstractGroupScan {
     }
 
     @Override
-    public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) throws ExecutionSetupException {
+    public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
         return new JdbcGroupScan(sql, plugin, rows);
     }
 

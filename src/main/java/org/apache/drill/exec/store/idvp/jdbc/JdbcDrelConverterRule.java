@@ -17,9 +17,11 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
+import com.google.common.base.Predicates;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.drill.exec.planner.logical.DrillRel;
+import org.apache.drill.exec.planner.logical.DrillRelFactories;
 
 /**
  * @author Oleg Zinoviev
@@ -28,13 +30,20 @@ import org.apache.drill.exec.planner.logical.DrillRel;
 public class JdbcDrelConverterRule extends ConverterRule {
 
     JdbcDrelConverterRule(DrillJdbcConvention in) {
-        super(RelNode.class, in, DrillRel.DRILL_LOGICAL, "IDVP_JDBC_DREL_Converter" + in.getName());
+        //noinspection Guava
+        super(RelNode.class,
+                Predicates.alwaysTrue(),
+                in,
+                DrillRel.DRILL_LOGICAL,
+                DrillRelFactories.LOGICAL_BUILDER,
+                "IDVP_JDBC_DREL_Converter" + in.getName());
     }
 
     @Override
     public RelNode convert(RelNode in) {
-        return new JdbcDrel(in.getCluster(), in.getTraitSet().replace(DrillRel.DRILL_LOGICAL),
-                convert(in, in.getTraitSet().replace(this.getInTrait())));
+        return new JdbcDrel(in.getCluster(),
+                in.getTraitSet().replace(DrillRel.DRILL_LOGICAL),
+                convert(in, in.getTraitSet().replace(this.getInTrait()).simplify()));
     }
 
 }

@@ -24,9 +24,10 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.sql.JdbcSqlDialect;
 import org.apache.calcite.sql.SqlDialect;
+import org.apache.calcite.sql.SqlDialectFactoryImpl;
 import org.apache.commons.dbcp.BasicDataSource;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.drill.common.JSONOptions;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.ops.OptimizerRulesContext;
@@ -169,12 +170,12 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
                 if (dialect == null) {
                     if (!config.isUseStandardDialect()) {
                         try (Connection connection = getSource().getConnection()) {
-                            this.dialect = JdbcSqlDialect.create(connection.getMetaData());
+                            this.dialect = JdbcSqlDialect.createDialect(connection.getMetaData());
                         } catch (SQLException e) {
-                            throw new IllegalStateException("Cannot connect to database", e);
+                            this.dialect = JdbcSqlDialect.createByDriverName(getConfig().getDriver());
                         }
                     } else {
-                        this.dialect = JdbcSchema.createDialect(getSource());
+                        this.dialect = JdbcSchema.createDialect(new SqlDialectFactoryImpl(), getSource());
                     }
                 }
             }
@@ -196,8 +197,7 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
     }
 
     @Override
-    public AbstractGroupScan getPhysicalScan(String userName, JSONOptions selection, List<SchemaPath> columns)
-            throws IOException {
+    public AbstractGroupScan getPhysicalScan(String userName, JSONOptions selection, List<SchemaPath> columns) {
         throw new UnsupportedOperationException();
     }
 

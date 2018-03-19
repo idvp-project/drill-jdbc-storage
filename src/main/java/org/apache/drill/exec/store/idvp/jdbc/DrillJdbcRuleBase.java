@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
+import com.google.common.base.Predicates;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -35,6 +36,7 @@ import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.drill.exec.planner.logical.DrillRelFactories;
 import org.apache.drill.exec.planner.sql.DrillCalciteSqlAggFunctionWrapper;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -59,7 +61,8 @@ abstract class DrillJdbcRuleBase extends ConverterRule {
     final JdbcConvention out;
 
     private DrillJdbcRuleBase(Class<? extends RelNode> clazz, RelTrait in, JdbcConvention out, String description) {
-        super(clazz, in, out, description);
+        //noinspection Guava (Drill не любит api java 8)
+        super(clazz, Predicates.alwaysTrue(), in, out, DrillRelFactories.LOGICAL_BUILDER, description);
         this.out = out;
     }
 
@@ -71,8 +74,10 @@ abstract class DrillJdbcRuleBase extends ConverterRule {
 
         public RelNode convert(RelNode rel) {
             LogicalProject project = (LogicalProject) rel;
-            return new JdbcRules.JdbcProject(rel.getCluster(), rel.getTraitSet().replace(this.out), convert(
-                    project.getInput(), project.getInput().getTraitSet().replace(this.out)), project.getProjects(),
+            return new JdbcRules.JdbcProject(rel.getCluster(),
+                    rel.getTraitSet().replace(this.out),
+                    convert(project.getInput(), project.getInput().getTraitSet().replace(this.out).simplify()),
+                    project.getProjects(),
                     project.getRowType());
         }
 
@@ -103,8 +108,10 @@ abstract class DrillJdbcRuleBase extends ConverterRule {
         public RelNode convert(RelNode rel) {
             LogicalFilter filter = (LogicalFilter) rel;
 
-            return new JdbcRules.JdbcFilter(rel.getCluster(), rel.getTraitSet().replace(this.out), convert(filter.getInput(),
-                    filter.getInput().getTraitSet().replace(this.out)), filter.getCondition());
+            return new JdbcRules.JdbcFilter(rel.getCluster(),
+                    rel.getTraitSet().replace(this.out),
+                    convert(filter.getInput(), filter.getInput().getTraitSet().replace(this.out).simplify()),
+                    filter.getCondition());
         }
 
         @Override
@@ -128,7 +135,7 @@ abstract class DrillJdbcRuleBase extends ConverterRule {
     static class DrillJdbcAggregateRule extends DrillJdbcRuleBase {
 
         DrillJdbcAggregateRule(JdbcConvention out) {
-            super(LogicalAggregate.class, Convention.NONE, out, "DrillJdbcAggregateRule");
+            super(LogicalAggregate.class, Convention.NONE, out, "iDVPDrillJdbcAggregateRule");
         }
 
         @Override
@@ -169,10 +176,9 @@ abstract class DrillJdbcRuleBase extends ConverterRule {
                         AggregateCall unwrappedCall = AggregateCall.create(
                                 (SqlAggFunction) wrapper.getOperator(),
                                 call.isDistinct(),
+                                call.isApproximate(),
                                 call.getArgList(),
                                 call.filterArg,
-                                -1, //Параметр игнорируется, если передать type,
-                                null, //Параметр игнорируется, если передать type
                                 call.getType(),
                                 call.getName());
                         unwrappedAggregates.add(unwrappedCall);
