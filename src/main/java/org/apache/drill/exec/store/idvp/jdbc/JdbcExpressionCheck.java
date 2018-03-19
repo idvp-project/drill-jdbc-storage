@@ -24,6 +24,11 @@ import org.apache.drill.exec.planner.sql.DrillSqlOperator;
  * Visitor class that determines whether or not a particular RexNode expression tree contains only standard expressions.
  * If RexNode tree contains Drill specific expressions, the tree will respond with false.
  */
+
+/**
+ * Visitor class that determines whether or not a particular RexNode expression tree contains only standard expressions.
+ * If RexNode tree contains Drill specific expressions, the tree will respond with false.
+ */
 class JdbcExpressionCheck implements RexVisitor<Boolean> {
 
     private static final JdbcExpressionCheck INSTANCE = new JdbcExpressionCheck();
@@ -49,9 +54,9 @@ class JdbcExpressionCheck implements RexVisitor<Boolean> {
 
     @Override
     public Boolean visitCall(RexCall paramRexCall) {
-        if (paramRexCall.getOperator() instanceof DrillSqlOperator) {
+        if(paramRexCall.getOperator() instanceof DrillSqlOperator){
             return false;
-        } else {
+        }else{
             for (RexNode operand : paramRexCall.operands) {
                 if (!operand.accept(this)) {
                     return false;
@@ -101,6 +106,21 @@ class JdbcExpressionCheck implements RexVisitor<Boolean> {
     @Override
     public Boolean visitFieldAccess(RexFieldAccess paramRexFieldAccess) {
         return paramRexFieldAccess.getReferenceExpr().accept(this);
+    }
+
+    @Override
+    public Boolean visitSubQuery(RexSubQuery subQuery) {
+        return null;
+    }
+
+    @Override
+    public Boolean visitTableInputRef(RexTableInputRef fieldRef) {
+        return false;
+    }
+
+    @Override
+    public Boolean visitPatternFieldRef(RexPatternFieldRef fieldRef) {
+        return false;
     }
 
 }

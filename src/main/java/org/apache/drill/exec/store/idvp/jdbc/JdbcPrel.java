@@ -69,14 +69,14 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
         sqlWriter.setQuoteAllIdentifiers(false);
         sqlWriter.setIndentation(0);
 
-        result.asQuery().unparse(sqlWriter, 0, 0);
+        result.asSelect().unparse(sqlWriter, 0, 0);
 
         sql = sqlWriter.toString();
         rowType = input.getRowType();
     }
 
     @Override
-    public PhysicalOperator getPhysicalOperator(PhysicalPlanCreator creator) throws IOException {
+    public PhysicalOperator getPhysicalOperator(PhysicalPlanCreator creator) {
         JdbcGroupScan output = new JdbcGroupScan(sql, convention.getPlugin(), rows);
         return creator.addMetadata(this, output);
     }

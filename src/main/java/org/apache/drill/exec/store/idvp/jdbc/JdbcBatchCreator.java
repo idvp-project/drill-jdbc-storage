@@ -19,7 +19,7 @@ package org.apache.drill.exec.store.idvp.jdbc;
 
 import com.google.common.base.Preconditions;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
-import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.ops.ExecutorFragmentContext;
 import org.apache.drill.exec.physical.impl.BatchCreator;
 import org.apache.drill.exec.physical.impl.ScanBatch;
 import org.apache.drill.exec.record.RecordBatch;
@@ -33,7 +33,8 @@ import java.util.List;
 @SuppressWarnings("unused")
 public class JdbcBatchCreator implements BatchCreator<JdbcSubScan> {
     @Override
-    public ScanBatch getBatch(FragmentContext context, JdbcSubScan config,
+    public ScanBatch getBatch(ExecutorFragmentContext context,
+                              JdbcSubScan config,
                               List<RecordBatch> children) throws ExecutionSetupException {
         Preconditions.checkArgument(children.isEmpty());
         JdbcStoragePlugin plugin = config.getPlugin();
