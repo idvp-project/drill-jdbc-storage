@@ -28,17 +28,16 @@ import org.apache.calcite.sql.JdbcSqlDialect;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.calcite.sql.SqlDialectFactoryImpl;
 import org.apache.commons.dbcp.BasicDataSource;
-import org.apache.drill.common.JSONOptions;
-import org.apache.drill.common.expression.SchemaPath;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.drill.exec.ops.OptimizerRulesContext;
-import org.apache.drill.exec.physical.base.AbstractGroupScan;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.store.AbstractStoragePlugin;
 import org.apache.drill.exec.store.SchemaConfig;
 
 import javax.sql.DataSource;
-import java.io.IOException;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
@@ -49,63 +48,31 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
     private final JdbcStorageConfig config;
     private final String name;
 
-    private BasicDataSource source;
-    private SqlDialect dialect;
-    private DrillJdbcConvention convention;
-
+    private volatile BasicDataSource source;
+    private volatile SqlDialect dialect;
+    private volatile DrillJdbcConvention convention;
+    private volatile JdbcCatalogSchema jdbcCatalogSchema;
 
     public JdbcStoragePlugin(JdbcStorageConfig config, @SuppressWarnings("unused") DrillbitContext context, String name) {
         this.config = config;
         this.name = name;
     }
 
-    /**
-     * Returns whether a condition is supported by {@link JdbcJoin}.
-     *
-     * <p>Corresponds to the capabilities of
-     * {@link JdbcJoin#convertConditionToSqlNode}.
-     *
-     * @param node Condition
-     * @return Whether condition is supported
-     */
-    @SuppressWarnings("unused")
-    private static boolean canJoinOnCondition(RexNode node) {
-        final List<RexNode> operands;
-        switch (node.getKind()) {
-            case AND:
-            case OR:
-                operands = ((RexCall) node).getOperands();
-                for (RexNode operand : operands) {
-                    if (!canJoinOnCondition(operand)) {
-                        return false;
-                    }
-                }
-                return true;
-
-            case EQUALS:
-            case IS_NOT_DISTINCT_FROM:
-            case NOT_EQUALS:
-            case GREATER_THAN:
-            case GREATER_THAN_OR_EQUAL:
-            case LESS_THAN:
-            case LESS_THAN_OR_EQUAL:
-                operands = ((RexCall) node).getOperands();
-                if ((operands.get(0) instanceof RexInputRef)
-                        && (operands.get(1) instanceof RexInputRef)) {
-                    return true;
-                }
-                // fall through
-
-            default:
-                return false;
-        }
-    }
 
     @Override
     public void registerSchemas(SchemaConfig config, SchemaPlus parent) {
-        JdbcCatalogSchema schema = new JdbcCatalogSchema(this, name);
+
+        if (jdbcCatalogSchema == null || jdbcCatalogSchema.isEvicted()) {
+            synchronized (this) {
+                if (jdbcCatalogSchema == null || jdbcCatalogSchema.isEvicted()) {
+                    jdbcCatalogSchema = new JdbcCatalogSchema(this, name);
+                }
+            }
+        }
+
+        JdbcCatalogSchema schema = this.jdbcCatalogSchema;
         SchemaPlus holder = parent.add(name, schema);
-        schema.setHolder(holder);
+        schema.fill(holder);
     }
 
     @Override
@@ -196,11 +163,6 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
         return convention;
     }
 
-    @Override
-    public AbstractGroupScan getPhysicalScan(String userName, JSONOptions selection, List<SchemaPath> columns) {
-        throw new UnsupportedOperationException();
-    }
-
     @SuppressWarnings("deprecation")
     @Override
     public Set<RelOptRule> getPhysicalOptimizerRules(OptimizerRulesContext context) {
@@ -217,6 +179,77 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
         super.close();
         if (source != null) {
             source.close();
+        }
+    }
+
+    boolean isSchema(List<String> schemaPath, String name) {
+        if (schemaPath != null && schemaPath.size() > 2) {
+            return false;
+        }
+
+        String catalog = null;
+        if (schemaPath != null && schemaPath.size() == 2) {
+            catalog = schemaPath.get(1);
+        }
+
+        try (Connection connection = getSource().getConnection()) {
+            DatabaseMetaData metaData = connection.getMetaData();
+            if (metaData.storesUpperCaseIdentifiers()) {
+                catalog = StringUtils.upperCase(catalog);
+                name = StringUtils.upperCase(name);
+            } else if (metaData.storesLowerCaseIdentifiers()) {
+                catalog = StringUtils.lowerCase(catalog);
+                name = StringUtils.lowerCase(name);
+            }
+
+            try (ResultSet rs = metaData.getSchemas(catalog, name)) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            logger.error("Error while getting schemas", e);
+            return false;
+        }
+    }
+
+    /**
+     * Returns whether a condition is supported by {@link JdbcJoin}.
+     *
+     * <p>Corresponds to the capabilities of
+     * {@link JdbcJoin#convertConditionToSqlNode}.
+     *
+     * @param node Condition
+     * @return Whether condition is supported
+     */
+    @SuppressWarnings({"unused", "JavadocReference"})
+    private static boolean canJoinOnCondition(RexNode node) {
+        final List<RexNode> operands;
+        switch (node.getKind()) {
+            case AND:
+            case OR:
+                operands = ((RexCall) node).getOperands();
+                for (RexNode operand : operands) {
+                    if (!canJoinOnCondition(operand)) {
+                        return false;
+                    }
+                }
+                return true;
+
+            case EQUALS:
+            case IS_NOT_DISTINCT_FROM:
+            case NOT_EQUALS:
+            case GREATER_THAN:
+            case GREATER_THAN_OR_EQUAL:
+            case LESS_THAN:
+            case LESS_THAN_OR_EQUAL:
+                operands = ((RexCall) node).getOperands();
+                if ((operands.get(0) instanceof RexInputRef)
+                        && (operands.get(1) instanceof RexInputRef)) {
+                    return true;
+                }
+                // fall through
+
+            default:
+                return false;
         }
     }
 }
