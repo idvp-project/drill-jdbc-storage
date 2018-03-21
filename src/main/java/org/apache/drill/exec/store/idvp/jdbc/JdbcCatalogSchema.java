@@ -24,8 +24,8 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Table;
 import org.apache.drill.exec.store.AbstractSchema;
 
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * @author Oleg Zinoviev
@@ -34,11 +34,11 @@ import java.util.concurrent.ConcurrentMap;
 class JdbcCatalogSchema extends AbstractSchema {
 
     private final JdbcStoragePlugin plugin;
-    private final ConcurrentMap<String, DrillJdbcSchema> children = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Object> children = new ConcurrentSkipListMap<>(String::compareToIgnoreCase);
     private LazyJdbcSchema rootSchema;
 
     JdbcCatalogSchema(JdbcStoragePlugin plugin, String name) {
-        super(ImmutableList.<String>of(), name);
+        super(ImmutableList.of(), name);
         this.plugin = plugin;
 
     }
@@ -58,32 +58,33 @@ class JdbcCatalogSchema extends AbstractSchema {
 
     @Override
     public DrillJdbcSchema getSubSchema(String name) {
-        DrillJdbcSchema subSchema = children.get(name);
-        if (subSchema == null) {
-            subSchema = new DrillJdbcSchema(getSchemaPath(), name, plugin);
-            children.putIfAbsent(name, subSchema);
+        Object schema = children.computeIfAbsent(name, n -> new DrillJdbcSchema(getSchemaPath(), n, plugin));
+        if (schema instanceof DrillJdbcSchema) {
+            return (DrillJdbcSchema) schema;
         }
-        return subSchema;
+
+        return null;
     }
 
     @Override
     public Table getTable(String name) {
-        Schema schema = getRootSchema();
-
-        if (schema != null) {
-            try {
+        Object table = children.computeIfAbsent(name, n -> {
+            Schema schema = getRootSchema();
+            if (schema != null) {
                 Table t = schema.getTable(name);
                 if (t != null) {
                     return t;
                 }
                 return schema.getTable(name.toUpperCase());
-            } catch (RuntimeException e) {
-                JdbcStoragePlugin.logger.warn("Failure while attempting to read table '{}' from JDBC source.", name, e);
-
             }
+
+            return null;
+        });
+
+        if (table instanceof Table) {
+            return (Table) table;
         }
 
-        // no table was found.
         return null;
     }
 
@@ -91,7 +92,11 @@ class JdbcCatalogSchema extends AbstractSchema {
         if (rootSchema == null) {
             synchronized (this) {
                 if (rootSchema == null) {
-                    this.rootSchema = new LazyJdbcSchema(plugin.getSource(), plugin.getDialect(), plugin.getConvention(), null, null);
+                    this.rootSchema = new LazyJdbcSchema(plugin.getSource(),
+                            plugin.getDialect(),
+                            plugin.getConvention(),
+                            null,
+                            null);
                 }
             }
         }

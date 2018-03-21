@@ -28,8 +28,8 @@ import org.apache.drill.exec.store.AbstractSchema;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * @author Oleg Zinoviev
@@ -39,7 +39,7 @@ class DrillJdbcSchema extends AbstractSchema {
 
     private final JdbcSchema inner;
     private final JdbcStoragePlugin plugin;
-    private final ConcurrentMap<String, DrillJdbcSchema> children = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Object> children = new ConcurrentSkipListMap<>(String::compareToIgnoreCase);
 
     DrillJdbcSchema(List<String> parentSchemaPath,
                     String name,
@@ -78,12 +78,12 @@ class DrillJdbcSchema extends AbstractSchema {
 
     @Override
     public DrillJdbcSchema getSubSchema(String name) {
-        DrillJdbcSchema subSchema = children.get(name);
-        if (subSchema == null) {
-            subSchema = new DrillJdbcSchema(getSchemaPath(), name, plugin);
-            children.putIfAbsent(name, subSchema);
+        Object schema = children.computeIfAbsent(name, n -> new DrillJdbcSchema(getSchemaPath(), n, plugin));
+        if (schema instanceof DrillJdbcSchema) {
+            return (DrillJdbcSchema) schema;
         }
-        return subSchema;
+
+        return null;
     }
 
     void setHolder(SchemaPlus plusOfThis) {
@@ -100,12 +100,12 @@ class DrillJdbcSchema extends AbstractSchema {
 
     @Override
     public Table getTable(String name) {
-        Table table = inner.getTable(name);
-        if (table != null) {
-            return table;
+        Object table = children.computeIfAbsent(name, inner::getTable);
+        if (table instanceof Table) {
+            return (Table) table;
         }
-        return inner.getTable(name.toUpperCase());
 
+        return null;
     }
 
 }
