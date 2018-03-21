@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.adapter.jdbc.JdbcImplementor;
 import org.apache.calcite.plan.ConventionTraitDef;
@@ -28,8 +29,11 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
-import org.apache.calcite.sql.SqlDialect;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.*;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.pretty.SqlPrettyWriter;
+import org.apache.calcite.sql.util.SqlShuttle;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.planner.physical.PhysicalPlanCreator;
 import org.apache.drill.exec.planner.physical.Prel;
@@ -38,6 +42,7 @@ import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
 
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.function.Function;
 
 /**
  * Represents a JDBC Plan once the children nodes have been rewritten into SQL.
@@ -53,6 +58,7 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
         final RelNode input = prel.getInput();
         //noinspection deprecation
         rows = input.getRows();
+        rowType = input.getRowType();
         convention = (DrillJdbcConvention) input.getTraitSet().getTrait(ConventionTraitDef.INSTANCE);
 
         // generate sql for tree.
@@ -68,10 +74,30 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
         sqlWriter.setQuoteAllIdentifiers(false);
         sqlWriter.setIndentation(0);
 
-        result.asStatement().unparse(sqlWriter, 0, 0);
+        SqlNode statement = result.asStatement();
+        if (statement instanceof SqlSelect) {
+            SqlSelect select = (SqlSelect) statement;
+            select.setSelectList(rewriteSelectList(select.getSelectList(), rowType));
+        }
+
+        statement.unparse(sqlWriter, 0, 0);
 
         sql = sqlWriter.toString();
-        rowType = input.getRowType();
+    }
+
+    private SqlNodeList rewriteSelectList(SqlNodeList selectList, RelDataType rowType) {
+        if (selectList == null) {
+            return null;
+        }
+
+        Function<Integer, String> aliasGenerator;
+        if (rowType.getFieldCount() == selectList.size()) {
+            aliasGenerator = index -> rowType.getFieldNames().get(index);
+        } else {
+            aliasGenerator = index -> "EXPR$" + index;
+        }
+
+        return (SqlNodeList) selectList.accept(new AliasShuttle(aliasGenerator));
     }
 
     @Override
@@ -126,6 +152,69 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
                 return super.visit(other);
             }
         }
-
     }
+
+    private class AliasShuttle extends SqlShuttle {
+        private int index = -1;
+        private final Function<Integer, String> aliasGenerator;
+
+        AliasShuttle(Function<Integer, String> aliasGenerator) {
+            this.aliasGenerator = Preconditions.checkNotNull(aliasGenerator);
+        }
+
+        @Override
+        public SqlNode visit(SqlCall call) {
+            index++;
+            if (call.getOperator() instanceof SqlAsOperator) {
+                return call;
+            }
+
+            return wrapToAsNode(call);
+        }
+
+        @Override
+        public SqlNode visit(SqlLiteral literal) {
+            index++;
+            return wrapToAsNode(literal);
+        }
+
+        @Override
+        public SqlNode visit(SqlDynamicParam param) {
+            index++;
+            return wrapToAsNode(param);
+        }
+
+        @Override
+        public SqlNode visit(SqlIdentifier id) {
+            index++;
+            return id;
+        }
+
+        @Override
+        public SqlNode visit(SqlIntervalQualifier intervalQualifier) {
+            index++;
+            return wrapToAsNode(intervalQualifier);
+        }
+
+        @Override
+        public SqlNode visit(SqlDataTypeSpec type) {
+            index++;
+            throw new IllegalStateException("SqlDataTypeSpec not supported");
+        }
+
+        private SqlNode wrapToAsNode(SqlNode node) {
+            String fieldName = aliasGenerator.apply(index);
+            SqlNode[] operands = {
+                    node,
+                    new SqlIdentifier(fieldName, node.getParserPosition())
+            };
+
+            return new SqlBasicCall(
+                    SqlStdOperatorTable.AS,
+                    operands,
+                    node.getParserPosition()
+            );
+        }
+    }
+
 }
