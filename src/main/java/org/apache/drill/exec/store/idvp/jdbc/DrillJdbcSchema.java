@@ -23,15 +23,13 @@ import org.apache.calcite.adapter.jdbc.LazyJdbcSchema;
 import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Table;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.drill.exec.store.AbstractSchema;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * @author Oleg Zinoviev
@@ -41,21 +39,26 @@ class DrillJdbcSchema extends AbstractSchema {
 
     private final JdbcSchema inner;
     private final JdbcStoragePlugin plugin;
-    private final ConcurrentMap<String, DrillJdbcSchema> children = new ConcurrentHashMap<>();
-    private final boolean isCatalog;
+    private final ConcurrentMap<String, Object> children = new ConcurrentSkipListMap<>(String::compareToIgnoreCase);
 
     DrillJdbcSchema(List<String> parentSchemaPath,
-                    String catalog,
-                    String schema,
+                    String name,
                     JdbcStoragePlugin plugin) {
-        super(parentSchemaPath, ObjectUtils.firstNonNull(schema, catalog));
+        super(parentSchemaPath, name);
         this.plugin = plugin;
-        inner = new LazyJdbcSchema(plugin.getSource(),
-                plugin.getDialect(),
-                plugin.getConvention(),
-                catalog,
-                schema);
-        this.isCatalog = StringUtils.isNotEmpty(catalog);
+        String catalog = null;
+        String schema = null;
+
+        if (getSchemaPath().size() == 2) {
+            schema = getSchemaPath().get(1);
+        }
+
+        if (getSchemaPath().size() == 3) {
+            catalog = getSchemaPath().get(1);
+            schema = getSchemaPath().get(2);
+        }
+
+        inner = new LazyJdbcSchema(plugin.getSource(), plugin.getDialect(), plugin.getConvention(), catalog, schema);
     }
 
     @Override
@@ -75,31 +78,19 @@ class DrillJdbcSchema extends AbstractSchema {
 
     @Override
     public DrillJdbcSchema getSubSchema(String name) {
-        return children.computeIfAbsent(name, s -> {
-            if (!isCatalog) {
-                return null;
-            }
-
-            //Поиск новых схем выполняем только для схем-каталогов
-            if (plugin.isSchema(getSchemaPath(), s)) {
-                return new DrillJdbcSchema(getSchemaPath(), null, s, plugin);
-            }
-            return null;
-        });
-    }
-
-    void addSubSchema(String name) {
-        DrillJdbcSchema subSchema = children.get(name);
-        if (subSchema == null) {
-            subSchema = new DrillJdbcSchema(getSchemaPath(), getName(), name, plugin);
-            children.putIfAbsent(name, subSchema);
+        Object schema = children.computeIfAbsent(name, n -> new DrillJdbcSchema(getSchemaPath(), n, plugin));
+        if (schema instanceof DrillJdbcSchema) {
+            return (DrillJdbcSchema) schema;
         }
+
+        return null;
     }
 
     void setHolder(SchemaPlus plusOfThis) {
-        for (DrillJdbcSchema schema : children.values()) {
-            SchemaPlus holder = plusOfThis.add(schema.getName(), schema);
-            schema.setHolder(holder);
+        for (String s : getSubSchemaNames()) {
+            DrillJdbcSchema inner = getSubSchema(s);
+            SchemaPlus holder = plusOfThis.add(s, inner);
+            inner.setHolder(holder);
         }
     }
 
@@ -109,13 +100,12 @@ class DrillJdbcSchema extends AbstractSchema {
 
     @Override
     public Table getTable(String name) {
-        Table table = inner.getTable(name);
-        if (table != null) {
-            return table;
+        Object table = children.computeIfAbsent(name, inner::getTable);
+        if (table instanceof Table) {
+            return (Table) table;
         }
-        return inner.getTable(name.toUpperCase());
 
+        return null;
     }
-
 
 }
