@@ -28,7 +28,6 @@ import org.apache.calcite.sql.JdbcSqlDialect;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.calcite.sql.SqlDialectFactoryImpl;
 import org.apache.commons.dbcp.BasicDataSource;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.drill.exec.ops.OptimizerRulesContext;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.store.AbstractStoragePlugin;
@@ -36,8 +35,6 @@ import org.apache.drill.exec.store.SchemaConfig;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
@@ -51,7 +48,6 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
     private volatile BasicDataSource source;
     private volatile SqlDialect dialect;
     private volatile DrillJdbcConvention convention;
-    private volatile JdbcCatalogSchema jdbcCatalogSchema;
 
     public JdbcStoragePlugin(JdbcStorageConfig config, @SuppressWarnings("unused") DrillbitContext context, String name) {
         this.config = config;
@@ -61,18 +57,9 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
 
     @Override
     public void registerSchemas(SchemaConfig config, SchemaPlus parent) {
-
-        if (jdbcCatalogSchema == null || jdbcCatalogSchema.isEvicted()) {
-            synchronized (this) {
-                if (jdbcCatalogSchema == null || jdbcCatalogSchema.isEvicted()) {
-                    jdbcCatalogSchema = new JdbcCatalogSchema(this, name);
-                }
-            }
-        }
-
-        JdbcCatalogSchema schema = this.jdbcCatalogSchema;
+        JdbcCatalogSchema schema = new JdbcCatalogSchema(this, name);
         SchemaPlus holder = parent.add(name, schema);
-        schema.fill(holder);
+        schema.setHolder(holder);
     }
 
     @Override
@@ -179,35 +166,6 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
         super.close();
         if (source != null) {
             source.close();
-        }
-    }
-
-    boolean isSchema(List<String> schemaPath, String name) {
-        if (schemaPath != null && schemaPath.size() > 2) {
-            return false;
-        }
-
-        String catalog = null;
-        if (schemaPath != null && schemaPath.size() == 2) {
-            catalog = schemaPath.get(1);
-        }
-
-        try (Connection connection = getSource().getConnection()) {
-            DatabaseMetaData metaData = connection.getMetaData();
-            if (metaData.storesUpperCaseIdentifiers()) {
-                catalog = StringUtils.upperCase(catalog);
-                name = StringUtils.upperCase(name);
-            } else if (metaData.storesLowerCaseIdentifiers()) {
-                catalog = StringUtils.lowerCase(catalog);
-                name = StringUtils.lowerCase(name);
-            }
-
-            try (ResultSet rs = metaData.getSchemas(catalog, name)) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            logger.error("Error while getting schemas", e);
-            return false;
         }
     }
 

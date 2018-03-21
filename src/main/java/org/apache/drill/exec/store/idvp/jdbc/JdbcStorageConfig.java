@@ -38,7 +38,6 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     static final String NAME = "jdbc-idvp";
     private static final int DEFAULT_POOL_SIZE = 64;
     private static final int DEFAULT_VALIDATION_TIMEOUT = 500;
-    private static final int DEFAULT_METADATA_LIFETIME = 0;
     private static final boolean DEFAULT_USE_STANDARD_DIALECT = false;
     private static final boolean DEFAULT_USE_EXTENDED_AGGREGATE_PUSH_DOWN = false;
     private static final int DEFAULT_EVICTION_PERIOD = 20000;
@@ -57,13 +56,10 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     private final boolean useStandardDialect;
     private final boolean useExtendedAggregatePushDown;
 
-    private final int metadataLifetime;
-
     //Конструктор для Jackson mapper. Создает объект со значениями свойств по-умолчанию
     @SuppressWarnings("unused")
     public JdbcStorageConfig() {
         this(null,
-                null,
                 null,
                 null,
                 null,
@@ -86,8 +82,7 @@ public class JdbcStorageConfig extends StoragePluginConfig {
             @JsonProperty("connectionEvictionPeriod") Integer connectionEvictionPeriod,
             @JsonProperty("connectionValidationTimeout") Integer connectionValidationTimeout,
             @JsonProperty("useStandardDialect") Boolean useStandardDialect,
-            @JsonProperty("useExtendedAggregatePushDown") Boolean useExtendedAggregatePushDown,
-            @JsonProperty("metadataLifetime") Integer metadataLifetime) {
+            @JsonProperty("useExtendedAggregatePushDown") Boolean useExtendedAggregatePushDown) {
         super();
         this.driver = driver;
         this.url = url;
@@ -99,8 +94,6 @@ public class JdbcStorageConfig extends StoragePluginConfig {
         this.useExtendedAggregatePushDown = ObjectUtils.firstNonNull(useExtendedAggregatePushDown, DEFAULT_USE_EXTENDED_AGGREGATE_PUSH_DOWN);
         this.connectionEvictionTimeout = ObjectUtils.firstNonNull(connectionEvictionTimeout, DEFAULT_EVICTION_TIMEOUT);
         this.connectionEvictionPeriod = ObjectUtils.firstNonNull(connectionEvictionPeriod, DEFAULT_EVICTION_PERIOD);
-        this.metadataLifetime = ObjectUtils.firstNonNull(metadataLifetime, DEFAULT_METADATA_LIFETIME);
-
     }
 
     @JsonProperty
@@ -163,13 +156,6 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public boolean isUseExtendedAggregatePushDown() {
         return useExtendedAggregatePushDown;
-    }
-
-    @JsonProperty
-    @JsonSerialize(using = MetadataLifetimeSerializer.class)
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
-    public int getMetadataLifetime() {
-        return metadataLifetime;
     }
 
     @Override
@@ -278,12 +264,6 @@ public class JdbcStorageConfig extends StoragePluginConfig {
     private final static class UseExtendedAggregatePushDownSerializer extends BooleanDefaultsSerializer {
         public UseExtendedAggregatePushDownSerializer() {
             super(DEFAULT_USE_EXTENDED_AGGREGATE_PUSH_DOWN);
-        }
-    }
-
-    private final static class MetadataLifetimeSerializer extends IntDefaultsSerializer {
-        public MetadataLifetimeSerializer() {
-            super(DEFAULT_METADATA_LIFETIME);
         }
     }
 
