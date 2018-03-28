@@ -155,7 +155,17 @@ public class JdbcSqlDialect extends SqlDialect {
 
     @Override
     public boolean supportsAggregateFunction(SqlKind kind) {
-        return dialect.supportsAggregateFunction(kind);
+        switch (kind) {
+            case COUNT:
+            case SUM:
+            //case SUM0:
+            case AVG:
+            case MIN:
+            case MAX:
+                return true;
+        }
+        return false;
+        //return dialect.supportsAggregateFunction(kind);
     }
 
     @Override
