@@ -172,7 +172,7 @@ class JdbcRecordReader extends AbstractRecordReader {
     }
 
     @Override
-    public void setup(OperatorContext operatorContext, OutputMutator output) throws ExecutionSetupException {
+    public void setup(OperatorContext operatorContext, OutputMutator output) {
         try {
 
             connection = source.getConnection();
@@ -261,7 +261,7 @@ class JdbcRecordReader extends AbstractRecordReader {
 
         } catch (SQLException | SchemaChangeException e) {
             throw UserException.dataReadError(e)
-                    .message("The JDBC storage plugin failed while trying setup the SQL query. ")
+                    .message("The JDBC storage plugin failed while trying setup the SQL query. %s", e.getMessage())
                     .addContext("sql", sql)
                     .addContext("plugin", storagePluginName)
                     .build(logger);
