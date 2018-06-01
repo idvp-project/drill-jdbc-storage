@@ -22,8 +22,12 @@ import org.apache.calcite.config.NullCollation;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.dialect.AnsiSqlDialect;
+import org.apache.drill.common.exceptions.UserException;
 
+import javax.sql.DataSource;
+import java.io.IOException;
 import java.sql.DatabaseMetaData;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -64,36 +68,56 @@ public class JdbcSqlDialect extends SqlDialect {
             .put("com.amazon.redshift.jdbc4.Driver", DatabaseProduct.REDSHIFT)
             .build();
 
-
-    public static JdbcSqlDialect createDialect(DatabaseMetaData databaseMetaData) {
+    public static JdbcSqlDialect createDialect(DatabaseMetaData databaseMetaData, DataSource dataSource) {
         SqlDialectFactory factory = new SqlDialectFactoryImpl();
         SqlDialect sqlDialect = factory.create(databaseMetaData);
-        return new JdbcSqlDialect(sqlDialect);
+        return new JdbcSqlDialect(sqlDialect, dataSource);
     }
 
-    public static SqlDialect createByDriverName(String driver) {
+    public static SqlDialect createByDriverName(String driver, DataSource dataSource) {
         DatabaseProduct product = DRIVERS_MAP.get(driver);
         if (product == null) {
-            return new JdbcSqlDialect(AnsiSqlDialect.DEFAULT);
+            return new JdbcSqlDialect(AnsiSqlDialect.DEFAULT, dataSource);
         }
 
-        return new JdbcSqlDialect(product.getDialect());
+        return new JdbcSqlDialect(product.getDialect(), dataSource);
     }
 
     private final SqlDialect dialect;
+    private final DataSource dataSource;
 
-    private JdbcSqlDialect(SqlDialect dialect) {
+    private volatile SqlIdentifierValidator validator;
+
+    private JdbcSqlDialect(SqlDialect dialect,
+                           DataSource dataSource) {
         super(emptyContext()
                 .withDatabaseProduct(DatabaseProduct.UNKNOWN)
                 .withIdentifierQuoteString("`"));
 
         this.dialect = dialect;
+        this.dataSource = dataSource;
     }
 
     @Override
     public boolean identifierNeedsToBeQuoted(String val) {
-        return !Pattern.compile("^[A-Za-z_0-9]+").matcher(val).matches();
+        if (validator == null) {
+            synchronized (this) {
+                if (validator == null) {
+                    try {
+                        validator = new SqlIdentifierValidator(dataSource);
+                    } catch (SQLException | IOException e) {
+                        throw UserException.planError(e)
+                                .message("The JDBC storage plugin failed while trying configure SQL Dialect")
+                                .build(LOGGER);
+                    }
+                }
+            }
+        }
+
+        return validator.identifierNeedsToBeQuoted(val);
     }
+
+
 
     //region SqlDialect delegation
     @Override
