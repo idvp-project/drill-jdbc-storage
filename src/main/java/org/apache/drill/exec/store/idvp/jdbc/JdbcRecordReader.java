@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.apache.drill.common.AutoCloseables;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
-import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.types.TypeProtos.MajorType;
@@ -165,7 +164,11 @@ class JdbcRecordReader extends AbstractRecordReader {
         } else if (v instanceof NullableBitVector) {
             return new BitCopier(offset, result, (NullableBitVector.Mutator) v.getMutator());
         } else if (v instanceof NullableDecimal18Vector) {
-            return new DecimalCopier(offset, result, (NullableDecimal18Vector.Mutator) v.getMutator());
+            return new Decimal18Copier(offset, result, (NullableDecimal18Vector.Mutator) v.getMutator());
+        } else if (v instanceof NullableDecimal28SparseVector) {
+            return new Decimal28Copier(offset, result, (NullableDecimal28SparseVector.Mutator) v.getMutator());
+        } else if (v instanceof NullableDecimal38SparseVector) {
+            return new Decimal38Copier(offset, result, (NullableDecimal38SparseVector.Mutator) v.getMutator());
         }
 
         throw new IllegalArgumentException("Unknown how to handle vector.");
@@ -230,13 +233,22 @@ class JdbcRecordReader extends AbstractRecordReader {
                         } else {
                             int precision = meta.getPrecision(i);
                             if (precision <= 0) {
-                                precision = 18;
+                                precision = 38;
+                            }
+
+                            MinorType decimalMinorType;
+                            if (precision > 28) {
+                                decimalMinorType = MinorType.DECIMAL38SPARSE;
+                            } else if (precision > 18) {
+                                decimalMinorType = MinorType.DECIMAL28SPARSE;
+                            } else {
+                                decimalMinorType = MinorType.DECIMAL18;
                             }
 
                             type = MajorType
                                     .newBuilder()
                                     .setMode(TypeProtos.DataMode.OPTIONAL)
-                                    .setMinorType(MinorType.DECIMAL18)
+                                    .setMinorType(decimalMinorType)
                                     .setScale(scale)
                                     .setPrecision(precision)
                                     .build();
@@ -383,12 +395,12 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     }
 
-    private static class DecimalCopier extends Copier<NullableDecimal18Vector.Mutator> {
+    private static class Decimal18Copier extends Copier<NullableDecimal18Vector.Mutator> {
 
         private final int scale;
         private final int precision;
 
-        DecimalCopier(int columnIndex, ResultSet result, NullableDecimal18Vector.Mutator mutator) {
+        Decimal18Copier(int columnIndex, ResultSet result, NullableDecimal18Vector.Mutator mutator) {
             super(columnIndex, result, mutator);
 
             try {
@@ -418,6 +430,39 @@ class JdbcRecordReader extends AbstractRecordReader {
         }
 
     }
+
+
+    private static class Decimal28Copier extends Copier<NullableDecimal28SparseVector.Mutator> {
+
+        Decimal28Copier(int columnIndex, ResultSet result, NullableDecimal28SparseVector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            BigDecimal decimal = result.getBigDecimal(columnIndex);
+            if (decimal != null) {
+                mutator.setSafe(index, decimal);
+            }
+        }
+    }
+
+    private static class Decimal38Copier extends Copier<NullableDecimal38SparseVector.Mutator> {
+
+        Decimal38Copier(int columnIndex, ResultSet result, NullableDecimal38SparseVector.Mutator mutator) {
+            super(columnIndex, result, mutator);
+        }
+
+        @Override
+        void copy(int index) throws SQLException {
+            BigDecimal decimal = result.getBigDecimal(columnIndex);
+            if (decimal != null) {
+                mutator.setSafe(index, decimal);
+            }
+        }
+
+    }
+
 
     private static class VarCharCopier extends Copier<NullableVarCharVector.Mutator> {
 
