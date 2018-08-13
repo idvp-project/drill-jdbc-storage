@@ -34,6 +34,7 @@ import org.apache.calcite.sql.*;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.pretty.SqlPrettyWriter;
 import org.apache.calcite.sql.util.SqlShuttle;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.planner.physical.PhysicalPlanCreator;
 import org.apache.drill.exec.planner.physical.Prel;
@@ -57,7 +58,7 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
         super(cluster, traitSet);
         final RelNode input = prel.getInput();
         //noinspection deprecation
-        rows = input.getRows();
+        rows = input.estimateRowCount(cluster.getMetadataQuery());
         rowType = input.getRowType();
         convention = (DrillJdbcConvention) input.getTraitSet().getTrait(ConventionTraitDef.INSTANCE);
 
@@ -85,6 +86,21 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
         sql = sqlWriter.toString();
     }
 
+    //Substitute newline. Also stripping away single line comments. Expecting hints to be nested in '/* <hint> */'
+    private String stripToOneLineSql(String sql) {
+        StringBuilder strippedSqlTextBldr = new StringBuilder(sql.length());
+        String sqlToken[] = sql.split("\\n");
+        for (String sqlTextLine : sqlToken) {
+            if (!StringUtils.trimToEmpty(sqlTextLine).startsWith("--")) { //Skip comments
+                strippedSqlTextBldr
+                        .append(sqlTextLine)
+                        .append(' ');
+            }
+        }
+
+        return strippedSqlTextBldr.toString();
+    }
+
     private SqlNodeList rewriteSelectList(SqlNodeList selectList, RelDataType rowType) {
         if (selectList == null) {
             return null;
@@ -108,7 +124,7 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
 
     @Override
     public RelWriter explainTerms(RelWriter pw) {
-        return super.explainTerms(pw).item("sql", sql);
+        return super.explainTerms(pw).item("sql", stripToOneLineSql(sql));
     }
 
     @Override

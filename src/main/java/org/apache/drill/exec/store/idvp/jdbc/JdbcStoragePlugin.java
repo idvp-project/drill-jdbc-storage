@@ -43,32 +43,27 @@ import java.util.Set;
 public class JdbcStoragePlugin extends AbstractStoragePlugin {
 
     private final JdbcStorageConfig config;
-    private final String name;
 
     private volatile BasicDataSource source;
     private volatile SqlDialect dialect;
     private volatile DrillJdbcConvention convention;
 
-    public JdbcStoragePlugin(JdbcStorageConfig config, @SuppressWarnings("unused") DrillbitContext context, String name) {
+    public JdbcStoragePlugin(JdbcStorageConfig config, DrillbitContext context, String name) {
+        super(context, name);
         this.config = config;
-        this.name = name;
     }
 
 
     @Override
     public void registerSchemas(SchemaConfig config, SchemaPlus parent) {
-        JdbcCatalogSchema schema = new JdbcCatalogSchema(this, name);
-        SchemaPlus holder = parent.add(name, schema);
+        JdbcCatalogSchema schema = new JdbcCatalogSchema(this, getName());
+        SchemaPlus holder = parent.add(getName(), schema);
         schema.setHolder(holder);
     }
 
     @Override
     public JdbcStorageConfig getConfig() {
         return config;
-    }
-
-    String getName() {
-        return this.name;
     }
 
     @Override
@@ -142,7 +137,7 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
         if (convention == null) {
             synchronized (this) {
                 if (convention == null) {
-                    this.convention = new DrillJdbcConvention(this, getDialect(), name);
+                    this.convention = new DrillJdbcConvention(this, getDialect(), getName());
                 }
             }
         }
