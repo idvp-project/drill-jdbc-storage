@@ -23,17 +23,17 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import org.apache.calcite.adapter.jdbc.JdbcConvention;
 import org.apache.calcite.adapter.jdbc.JdbcRules;
-import org.apache.calcite.plan.Convention;
-import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.plan.RelTrait;
-import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.*;
 import org.apache.calcite.rel.InvalidRelException;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.core.AggregateCall;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.drill.exec.planner.logical.DrillRelFactories;
@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 
 abstract class DrillJdbcRuleBase extends ConverterRule {
 
+    @SuppressWarnings("UnstableApiUsage")
     final LoadingCache<RexNode, Boolean> checkedExpressions = CacheBuilder.newBuilder()
             .maximumSize(1000)
             .expireAfterWrite(10, TimeUnit.MINUTES)
@@ -189,6 +190,60 @@ abstract class DrillJdbcRuleBase extends ConverterRule {
                 }
             }
             return hasWrappedAggregate;
+        }
+    }
+
+    static class DrillJdbcSortRule extends DrillJdbcRuleBase {
+
+        DrillJdbcSortRule(JdbcConvention out) {
+            super(Sort.class, Convention.NONE, out, "iDVPDrillJdbcSortRule");
+        }
+
+        @Override
+        public boolean matches(RelOptRuleCall call) {
+            final Sort sort = call.rel(0);
+            //noinspection deprecation
+            if (out.dialect.supportsOffsetFetch()) {
+                // Если диалект поддерживает
+                return true;
+            }
+
+            return sort.offset == null && sort.fetch == null;
+        }
+
+        @Override
+        public RelNode convert(RelNode rel) {
+            Sort sort = (Sort) rel;
+
+            final RelTraitSet traitSet = sort.getTraitSet().replace(out);
+
+            final RelNode input = convert(sort.getInput(), sort.getInput().getTraitSet().replace(out).simplify());
+            return new DrillJdbcSort(sort.getCluster(), traitSet, input, sort.getCollation(), sort.offset, sort.fetch);
+        }
+
+        private static class DrillJdbcSort extends JdbcRules.JdbcSort {
+
+            DrillJdbcSort(RelOptCluster cluster,
+                          RelTraitSet traitSet,
+                          RelNode input,
+                          RelCollation collation,
+                          RexNode offset,
+                          RexNode fetch) {
+                super(cluster, traitSet, input, collation, offset, fetch);
+            }
+
+            @Override
+            public DrillJdbcSort copy(RelTraitSet traitSet, RelNode newInput, RelCollation newCollation, RexNode offset, RexNode fetch) {
+                return new DrillJdbcSort(getCluster(), traitSet, newInput, newCollation, offset, fetch);
+            }
+
+            @Override
+            public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
+                // см SortPrel
+                // оценка цены операции сортировки в drill происходит с модификаторами
+                // Сортировка в бд априори выгоднее, чем в drill, поэтому применяем модификатор 0.01, который меньше всех операторов drill
+                return super.computeSelfCost(planner, mq).multiplyBy(0.01);
+            }
         }
     }
 

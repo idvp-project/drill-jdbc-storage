@@ -37,7 +37,7 @@ public class DrillJdbcConvention extends JdbcConvention {
     private static final JdbcPrule JDBC_PRULE_INSTANCE = new JdbcPrule();
     // Rules from Calcite's JdbcRules class that we want to avoid using.
     private static String[] RULES_TO_AVOID = {
-            "JdbcToEnumerableConverterRule", "JdbcFilterRule", "JdbcProjectRule"
+            "JdbcToEnumerableConverterRule", "JdbcFilterRule", "JdbcProjectRule", "JdbcSortRule"
     };
 
     private JdbcStoragePlugin plugin;
@@ -55,6 +55,7 @@ public class DrillJdbcConvention extends JdbcConvention {
         builder.add(new JdbcDrelConverterRule(this));
         builder.add(new DrillJdbcRuleBase.DrillJdbcProjectRule(this));
         builder.add(new DrillJdbcRuleBase.DrillJdbcFilterRule(this));
+        builder.add(new DrillJdbcRuleBase.DrillJdbcSortRule(this));
 
         if (plugin.getConfig().isUseExtendedAggregatePushDown()) {
             builder.add(new DrillJdbcRuleBase.DrillJdbcAggregateRule(this));

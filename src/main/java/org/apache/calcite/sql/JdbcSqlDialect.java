@@ -17,11 +17,13 @@
  */
 package org.apache.calcite.sql;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import org.apache.calcite.config.NullCollation;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.dialect.AnsiSqlDialect;
+import org.apache.calcite.sql.dialect.PostgresqlSqlDialect;
 import org.apache.drill.common.exceptions.UserException;
 
 import javax.sql.DataSource;
@@ -30,7 +32,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
-import java.util.regex.Pattern;
+import java.util.Map;
 
 /**
  * @author Oleg Zinoviev
@@ -39,6 +41,8 @@ import java.util.regex.Pattern;
 @SuppressWarnings("SpellCheckingInspection")
 public class JdbcSqlDialect extends SqlDialect {
 
+    private final static Map<Class<? extends SqlDialect>, UnparseOffsetFetchOverride> SUPPORTS_FETCH_OFFSET =
+            ImmutableMap.of(PostgresqlSqlDialect.class, UnparseOffsetFetchOverride.EMPTY);
 
     private final static ImmutableSortedMap<String, DatabaseProduct> DRIVERS_MAP = ImmutableSortedMap.<String, DatabaseProduct>orderedBy(String::compareToIgnoreCase)
             .put("com.simba.googlebigquery.jdbc42.Driver", DatabaseProduct.BIG_QUERY)
@@ -74,7 +78,7 @@ public class JdbcSqlDialect extends SqlDialect {
         return new JdbcSqlDialect(sqlDialect, dataSource);
     }
 
-    public static SqlDialect createByDriverName(String driver, DataSource dataSource) {
+    public static JdbcSqlDialect createByDriverName(String driver, DataSource dataSource) {
         DatabaseProduct product = DRIVERS_MAP.get(driver);
         if (product == null) {
             return new JdbcSqlDialect(AnsiSqlDialect.DEFAULT, dataSource);
@@ -217,9 +221,22 @@ public class JdbcSqlDialect extends SqlDialect {
         return dialect.emulateNullDirectionWithIsNull(node, nullsFirst, desc);
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public boolean supportsOffsetFetch() {
-        return dialect.supportsOffsetFetch();
+        return dialect.supportsOffsetFetch()
+                && SUPPORTS_FETCH_OFFSET.containsKey(dialect.getClass());
+    }
+
+    @Override
+    public void unparseOffsetFetch(SqlWriter writer, SqlNode offset, SqlNode fetch) {
+        //noinspection deprecation
+        UnparseOffsetFetchOverride override = SUPPORTS_FETCH_OFFSET.getOrDefault(dialect.getClass(), UnparseOffsetFetchOverride.EMPTY);
+        if (override == UnparseOffsetFetchOverride.EMPTY) {
+            dialect.unparseOffsetFetch(writer, offset, fetch);
+        } else {
+            override.unparse(writer, offset, fetch);
+        }
     }
 
     @Override
@@ -243,6 +260,11 @@ public class JdbcSqlDialect extends SqlDialect {
     }
 
     @Override
+    public boolean supportsFunction(SqlOperator operator, RelDataType type, List<RelDataType> paramTypes) {
+        return dialect.supportsFunction(operator, type, paramTypes);
+    }
+
+    @Override
     public String quoteIdentifier(String val) {
         return dialect.quoteIdentifier(val);
     }
@@ -256,5 +278,12 @@ public class JdbcSqlDialect extends SqlDialect {
     public StringBuilder quoteIdentifier(StringBuilder buf, List<String> identifiers) {
         return dialect.quoteIdentifier(buf, identifiers);
     }
+
     //region SqlDialect delegation
+
+    interface UnparseOffsetFetchOverride {
+        UnparseOffsetFetchOverride EMPTY = (writer, offset, fetch) -> { };
+
+        void unparse(SqlWriter writer, SqlNode offset, SqlNode fetch);
+    }
 }
