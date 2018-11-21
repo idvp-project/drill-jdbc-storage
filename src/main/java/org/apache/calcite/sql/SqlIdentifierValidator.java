@@ -70,6 +70,7 @@ class SqlIdentifierValidator {
                         Pattern.compile(",").splitAsStream(sqlKeywords),
                         reader.lines()
                 )
+                        .map(StringUtils::trim)
                         .filter(StringUtils::isNotBlank)
                         .collect(Collectors.toCollection(() -> new TreeSet<>(String::compareToIgnoreCase)));
             }
