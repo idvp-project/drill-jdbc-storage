@@ -10,3 +10,4 @@ target
 .classpath
 .settings
 dependency-reduced-pom.xml
+.java-version
