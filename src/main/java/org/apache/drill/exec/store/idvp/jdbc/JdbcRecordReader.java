@@ -39,11 +39,11 @@ import org.apache.drill.exec.vector.*;
 import javax.sql.DataSource;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
-import java.sql.*;
+import java.math.RoundingMode;
 import java.sql.Date;
+import java.sql.*;
 import java.util.*;
 
-@SuppressWarnings("unchecked")
 class JdbcRecordReader extends AbstractRecordReader {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JdbcRecordReader.class);
     private static final TypeValidators.BooleanValidator DECIMAL_ENABLED = new TypeValidators.BooleanValidator("planner.enable_decimal_data_type");
@@ -134,7 +134,7 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     }
 
-    private Copier<?> getCopier(int offset, ResultSet result, TypeInfo typeInfo, ValueVector v) {
+    private Copier<?> getCopier(int offset, ResultSet result, TypeInfo typeInfo, MajorType type, ValueVector v) {
 
         if (typeInfo.copierOverride != null) {
             return typeInfo.copierOverride.create(offset, resultSet, v.getMutator());
@@ -161,7 +161,7 @@ class JdbcRecordReader extends AbstractRecordReader {
         } else if (v instanceof NullableBitVector) {
             return new BitCopier(offset, result, (NullableBitVector.Mutator) v.getMutator());
         } else if (v instanceof NullableVarDecimalVector) {
-            return new VarDecimalCopier(offset, result, (NullableVarDecimalVector.Mutator) v.getMutator());
+            return new VarDecimalCopier(offset, type, result, (NullableVarDecimalVector.Mutator) v.getMutator());
         }
 
         throw new IllegalArgumentException("Unknown how to handle vector.");
@@ -248,7 +248,7 @@ class JdbcRecordReader extends AbstractRecordReader {
                 final Class<? extends ValueVector> clazz = TypeHelper.getValueVectorClass(type.getMinorType(), type.getMode());
                 ValueVector vector = output.addField(field, clazz);
                 vectorBuilder.add(vector);
-                copierBuilder.add(getCopier(i, resultSet, typeInfo, vector));
+                copierBuilder.add(getCopier(i, resultSet, typeInfo, type, vector));
 
             }
 
@@ -381,15 +381,18 @@ class JdbcRecordReader extends AbstractRecordReader {
 
     private static class VarDecimalCopier extends Copier<NullableVarDecimalVector.Mutator> {
 
-        VarDecimalCopier(int columnIndex, ResultSet result, NullableVarDecimalVector.Mutator mutator) {
+        private final int scale;
+
+        VarDecimalCopier(int columnIndex, MajorType type, ResultSet result, NullableVarDecimalVector.Mutator mutator) {
             super(columnIndex, result, mutator);
+            this.scale = type.getScale();
         }
 
         @Override
         void copy(int index) throws SQLException {
             BigDecimal decimal = result.getBigDecimal(columnIndex);
             if (decimal != null) {
-                mutator.setSafe(index, decimal);
+                mutator.setSafe(index, decimal.setScale(scale, RoundingMode.HALF_UP));
             }
         }
 
