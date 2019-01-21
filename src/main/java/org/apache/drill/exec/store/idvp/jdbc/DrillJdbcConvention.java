@@ -17,7 +17,7 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
-import com.google.common.collect.ImmutableSet;
+import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableSet;
 import org.apache.calcite.adapter.jdbc.JdbcConvention;
 import org.apache.calcite.adapter.jdbc.JdbcRules;
 import org.apache.calcite.linq4j.tree.ConstantUntypedNull;

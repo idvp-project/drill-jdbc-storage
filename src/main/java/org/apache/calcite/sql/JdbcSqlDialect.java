@@ -17,8 +17,8 @@
  */
 package org.apache.calcite.sql;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSortedMap;
+import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableMap;
+import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableSortedMap;
 import org.apache.calcite.config.NullCollation;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.type.RelDataType;

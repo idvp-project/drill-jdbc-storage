@@ -51,16 +51,4 @@ public class JdbcDrel extends SingleRel implements DrillRel {
         throw new UnsupportedOperationException();
     }
 
-    @Override
-    public RelNode accept(RelShuttle shuttle) {
-        if (FindHardDistributionScansClassHolder.CLASS.isAssignableFrom(shuttle.getClass())) {
-            // Делаем так, чтобы этот visitor не смог обратиться к children,
-            // так как там лежит JdbcTableScan, поле table которого содержит, в итоге,
-            // JdbcTable - класс из кальцита, не реализующий drill table
-            // TODO: Вообще - это костыль, нужно рассмотреть вариант возвращать из схемы собственную имплементацию DrillTable
-            return this;
-        } else {
-            return super.accept(shuttle);
-        }
-    }
 }

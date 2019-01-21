@@ -17,7 +17,7 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
-import com.google.common.base.Predicates;
+import org.apache.drill.shaded.guava.com.google.common.base.Predicates;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.drill.exec.planner.logical.DrillRel;

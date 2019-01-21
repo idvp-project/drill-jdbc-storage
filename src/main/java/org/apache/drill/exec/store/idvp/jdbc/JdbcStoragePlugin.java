@@ -27,11 +27,13 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.JdbcSqlDialect;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.calcite.sql.SqlDialectFactoryImpl;
-import org.apache.commons.dbcp.BasicDataSource;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.drill.exec.ops.OptimizerRulesContext;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.store.AbstractStoragePlugin;
 import org.apache.drill.exec.store.SchemaConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -41,6 +43,8 @@ import java.util.List;
 import java.util.Set;
 
 public class JdbcStoragePlugin extends AbstractStoragePlugin {
+
+    final static Logger logger = LoggerFactory.getLogger(JdbcStoragePlugin.class);
 
     private final JdbcStorageConfig config;
 
@@ -88,7 +92,7 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
                         source.setPassword(config.getPassword());
                     }
 
-                    source.setMaxActive(config.getConnectionPoolSize());
+                    source.setMaxTotal(config.getConnectionPoolSize());
                     if (config.getConnectionValidationTimeout() > 0) {
                         int timeoutInSeconds = Math.max(config.getConnectionValidationTimeout() / 1000, 1);
 

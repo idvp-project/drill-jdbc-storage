@@ -17,7 +17,7 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
-import com.google.common.base.Joiner;
+import org.apache.drill.shaded.guava.com.google.common.base.Joiner;
 import org.apache.calcite.adapter.jdbc.JdbcSchema;
 import org.apache.calcite.adapter.jdbc.LazyJdbcSchema;
 import org.apache.calcite.schema.Function;
