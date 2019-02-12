@@ -20,12 +20,10 @@ package org.apache.drill.exec.store.idvp.jdbc;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelShuttle;
 import org.apache.calcite.rel.SingleRel;
 import org.apache.drill.common.logical.data.LogicalOperator;
 import org.apache.drill.exec.planner.logical.DrillImplementor;
 import org.apache.drill.exec.planner.logical.DrillRel;
-import org.apache.drill.exec.planner.sql.handlers.FindHardDistributionScansClassHolder;
 
 import java.util.List;
 
@@ -49,18 +47,5 @@ public class JdbcDrel extends SingleRel implements DrillRel {
     @Override
     public LogicalOperator implement(DrillImplementor implementor) {
         throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public RelNode accept(RelShuttle shuttle) {
-        if (FindHardDistributionScansClassHolder.CLASS.isAssignableFrom(shuttle.getClass())) {
-            // Делаем так, чтобы этот visitor не смог обратиться к children,
-            // так как там лежит JdbcTableScan, поле table которого содержит, в итоге,
-            // JdbcTable - класс из кальцита, не реализующий drill table
-            // TODO: Вообще - это костыль, нужно рассмотреть вариант возвращать из схемы собственную имплементацию DrillTable
-            return this;
-        } else {
-            return super.accept(shuttle);
-        }
     }
 }
