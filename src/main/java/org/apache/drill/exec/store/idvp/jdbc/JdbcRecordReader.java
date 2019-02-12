@@ -72,9 +72,9 @@ class JdbcRecordReader extends AbstractRecordReader {
 
                 .put(java.sql.Types.NUMERIC, new TypeInfo(MinorType.VARDECIMAL))
                 .put(java.sql.Types.DECIMAL, new TypeInfo(MinorType.VARDECIMAL))
-                .put(java.sql.Types.REAL, new TypeInfo(MinorType.FLOAT8))
+                .put(java.sql.Types.REAL, new TypeInfo(MinorType.FLOAT4))
                 .put(java.sql.Types.DOUBLE, new TypeInfo(MinorType.FLOAT8))
-                .put(java.sql.Types.FLOAT, new TypeInfo(MinorType.FLOAT4))
+                .put(java.sql.Types.FLOAT, new TypeInfo(MinorType.FLOAT8))
 
                 .put(java.sql.Types.DATE, new TypeInfo(MinorType.DATE))
                 .put(java.sql.Types.TIME, new TypeInfo(MinorType.TIME))
