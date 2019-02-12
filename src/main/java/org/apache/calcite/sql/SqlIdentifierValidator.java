@@ -20,11 +20,14 @@ package org.apache.calcite.sql;
 import com.google.common.collect.ImmutableMap;
 import org.apache.calcite.sql.dialect.OracleSqlDialect;
 import org.apache.commons.lang3.StringUtils;
-import org.pentaho.aggdes.model.Dialect;
 
 import javax.sql.DataSource;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
 import java.util.Map;
@@ -52,9 +55,11 @@ class SqlIdentifierValidator {
     private final Set<String> reserved;
 
     SqlIdentifierValidator(SqlDialect dialect, DataSource dataSource) throws SQLException, IOException {
-        DatabaseMetaData metaData = dataSource.getConnection().getMetaData();
-        this.identifierPattern = createIdentifierPattern(dialect, metaData);
-        this.reserved = createReserved(metaData);
+        try (Connection connection = dataSource.getConnection()) {
+            DatabaseMetaData metaData = connection.getMetaData();
+            this.identifierPattern = createIdentifierPattern(dialect, metaData);
+            this.reserved = createReserved(metaData);
+        }
     }
 
     boolean identifierNeedsToBeQuoted(String val) {
