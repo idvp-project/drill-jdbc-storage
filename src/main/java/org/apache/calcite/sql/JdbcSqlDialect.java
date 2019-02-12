@@ -108,7 +108,7 @@ public class JdbcSqlDialect extends SqlDialect {
             synchronized (this) {
                 if (validator == null) {
                     try {
-                        validator = new SqlIdentifierValidator(dataSource);
+                        validator = new SqlIdentifierValidator(dialect, dataSource);
                     } catch (SQLException | IOException e) {
                         throw UserException.planError(e)
                                 .message("The JDBC storage plugin failed while trying configure SQL Dialect")

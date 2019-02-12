@@ -17,13 +17,17 @@
  */
 package org.apache.calcite.sql;
 
+import com.google.common.collect.ImmutableMap;
+import org.apache.calcite.sql.dialect.OracleSqlDialect;
 import org.apache.commons.lang3.StringUtils;
+import org.pentaho.aggdes.model.Dialect;
 
 import javax.sql.DataSource;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
@@ -35,12 +39,21 @@ import java.util.stream.Stream;
  * @since 01.06.18
  */
 class SqlIdentifierValidator {
+
+    /**
+     * Дополнительные символы, которые НЕ должны использоваться в идентификаторах без кавычек.
+     * Необходимость в костыле возникла потому, что Oracle {@link DatabaseMetaData#getExtraNameCharacters()}
+     * возвращает $ как допустимый символ, ОДНАКО запросы с такими символами падают!!!
+     */
+    private final static Map<Class<?>, String> FORCE_EXCLUDED_CHARS =
+            ImmutableMap.of(OracleSqlDialect.class, "$");
+
     private final Pattern identifierPattern;
     private final Set<String> reserved;
 
-    SqlIdentifierValidator(DataSource dataSource) throws SQLException, IOException {
+    SqlIdentifierValidator(SqlDialect dialect, DataSource dataSource) throws SQLException, IOException {
         DatabaseMetaData metaData = dataSource.getConnection().getMetaData();
-        this.identifierPattern = createIdentifierPattern(metaData);
+        this.identifierPattern = createIdentifierPattern(dialect, metaData);
         this.reserved = createReserved(metaData);
     }
 
@@ -48,10 +61,16 @@ class SqlIdentifierValidator {
         return !identifierPattern.matcher(val).matches() || reserved.contains(val);
     }
 
-    private Pattern createIdentifierPattern(DatabaseMetaData metaData) throws SQLException {
+    private Pattern createIdentifierPattern(SqlDialect dialect, DatabaseMetaData metaData) throws SQLException {
+        String forceExcluded = FORCE_EXCLUDED_CHARS.getOrDefault(dialect.getClass(), "");
+
         final StringBuilder identifierPatternBuilder = new StringBuilder("^[A-Za-z_0-9");
         String extraNameCharacters = metaData.getExtraNameCharacters();
         for (char extraCharacter : extraNameCharacters.toCharArray()) {
+            if (forceExcluded.contains(extraNameCharacters)) {
+                continue;
+            }
+
             identifierPatternBuilder.append(Pattern.quote(String.valueOf(extraCharacter)));
         }
 
