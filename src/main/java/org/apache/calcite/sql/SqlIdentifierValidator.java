@@ -17,7 +17,7 @@
  */
 package org.apache.calcite.sql;
 
-import com.google.common.collect.ImmutableMap;
+import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableMap;
 import org.apache.calcite.sql.dialect.OracleSqlDialect;
 import org.apache.commons.lang3.StringUtils;
 
