@@ -20,12 +20,10 @@ package org.apache.drill.exec.store.idvp.jdbc;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelShuttle;
 import org.apache.calcite.rel.SingleRel;
 import org.apache.drill.common.logical.data.LogicalOperator;
 import org.apache.drill.exec.planner.logical.DrillImplementor;
 import org.apache.drill.exec.planner.logical.DrillRel;
-import org.apache.drill.exec.planner.sql.handlers.FindHardDistributionScansClassHolder;
 
 import java.util.List;
 
