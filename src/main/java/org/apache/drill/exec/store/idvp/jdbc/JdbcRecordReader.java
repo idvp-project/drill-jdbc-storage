@@ -21,6 +21,7 @@ import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.shaded.guava.com.google.common.base.Charsets;
 import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableList;
 import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableMap;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.AutoCloseables;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.types.TypeProtos;
@@ -45,12 +46,62 @@ import java.sql.Date;
 import java.sql.*;
 import java.util.*;
 
-class JdbcRecordReader extends AbstractRecordReader {
+public class JdbcRecordReader extends AbstractRecordReader {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JdbcRecordReader.class);
 
+    // Эти маппинги должны быть согласованы
+    private static final ImmutableMap<Integer, SqlTypeName> DRILL_TYPE_NAMES;
     private static final ImmutableMap<Integer, TypeInfo> JDBC_TYPE_MAPPINGS;
 
     static {
+
+        DRILL_TYPE_NAMES = ImmutableMap.<Integer, SqlTypeName>builder()
+                .put(java.sql.Types.TINYINT, SqlTypeName.TINYINT)
+                .put(java.sql.Types.SMALLINT, SqlTypeName.SMALLINT)
+                .put(java.sql.Types.INTEGER, SqlTypeName.INTEGER)
+                .put(java.sql.Types.BIGINT, SqlTypeName.BIGINT)
+
+                .put(java.sql.Types.CHAR, SqlTypeName.CHAR)
+                .put(java.sql.Types.VARCHAR, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.LONGVARCHAR, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.CLOB, SqlTypeName.VARCHAR)
+
+                .put(java.sql.Types.NCHAR, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.NVARCHAR, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.LONGNVARCHAR, SqlTypeName.VARCHAR)
+
+                .put(java.sql.Types.VARBINARY, SqlTypeName.VARBINARY)
+                .put(java.sql.Types.LONGVARBINARY, SqlTypeName.VARBINARY)
+                .put(java.sql.Types.BLOB, SqlTypeName.VARBINARY)
+
+                .put(java.sql.Types.NUMERIC, SqlTypeName.DECIMAL)
+                .put(java.sql.Types.DECIMAL, SqlTypeName.DECIMAL)
+                .put(java.sql.Types.REAL, SqlTypeName.REAL)
+                .put(java.sql.Types.DOUBLE, SqlTypeName.DOUBLE)
+                .put(java.sql.Types.FLOAT, SqlTypeName.DOUBLE)
+
+                .put(java.sql.Types.DATE, SqlTypeName.DATE)
+                .put(java.sql.Types.TIME, SqlTypeName.TIME)
+                .put(java.sql.Types.TIMESTAMP, SqlTypeName.TIMESTAMP)
+
+                .put(java.sql.Types.BOOLEAN, SqlTypeName.BOOLEAN)
+
+                .put(java.sql.Types.BIT, SqlTypeName.BOOLEAN)
+
+                // Потенциальный источник проблем
+                .put(java.sql.Types.OTHER, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.ARRAY, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.STRUCT, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.JAVA_OBJECT, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.REF, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.DATALINK, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.NULL, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.SQLXML, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.ROWID, SqlTypeName.VARCHAR)
+                .put(java.sql.Types.DISTINCT, SqlTypeName.VARCHAR)
+
+                .build();
+
         JDBC_TYPE_MAPPINGS = ImmutableMap.<Integer, TypeInfo>builder()
                 .put(java.sql.Types.TINYINT, new TypeInfo(MinorType.INT))
                 .put(java.sql.Types.SMALLINT, new TypeInfo(MinorType.INT))
@@ -97,6 +148,10 @@ class JdbcRecordReader extends AbstractRecordReader {
                 .put(java.sql.Types.DISTINCT, new TypeInfo(MinorType.VARCHAR, new Object2VarCharCopier.Provider()))
 
                 .build();
+    }
+
+    public static SqlTypeName getNameForJdbcType(int jdbcType) {
+        return DRILL_TYPE_NAMES.get(jdbcType);
     }
 
     private final DataSource source;
