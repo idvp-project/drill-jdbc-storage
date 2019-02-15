@@ -89,7 +89,7 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
     //Substitute newline. Also stripping away single line comments. Expecting hints to be nested in '/* <hint> */'
     private String stripToOneLineSql(String sql) {
         StringBuilder strippedSqlTextBldr = new StringBuilder(sql.length());
-        String sqlToken[] = sql.split("\\n");
+        String[] sqlToken = sql.split("\\n");
         for (String sqlTextLine : sqlToken) {
             if (!StringUtils.trimToEmpty(sqlTextLine).startsWith("--")) { //Skip comments
                 strippedSqlTextBldr

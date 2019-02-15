@@ -202,13 +202,23 @@ abstract class DrillJdbcRuleBase extends ConverterRule {
         @Override
         public boolean matches(RelOptRuleCall call) {
             final Sort sort = call.rel(0);
-            //noinspection deprecation
-            if (out.dialect.supportsOffsetFetch()) {
-                // Если диалект поддерживает
-                return true;
-            }
+            try {
+                for (RexNode node : sort.getChildExps()) {
+                    if (!checkedExpressions.get(node)) {
+                        return false;
+                    }
+                }
 
-            return sort.offset == null && sort.fetch == null;
+                //noinspection deprecation
+                if (out.dialect.supportsOffsetFetch()) {
+                    // Если диалект поддерживает
+                    return true;
+                }
+
+                return sort.offset == null && sort.fetch == null;
+            } catch (ExecutionException e) {
+                throw new IllegalStateException("Failure while trying to evaluate pushdown.", e);
+            }
         }
 
         @Override
@@ -217,7 +227,7 @@ abstract class DrillJdbcRuleBase extends ConverterRule {
 
             final RelTraitSet traitSet = sort.getTraitSet().replace(out);
 
-            final RelNode input = convert(sort.getInput(), sort.getInput().getTraitSet().replace(out).simplify());
+            final RelNode input = convert(sort.getInput(), traitSet.simplify());
             return new DrillJdbcSort(sort.getCluster(), traitSet, input, sort.getCollation(), sort.offset, sort.fetch);
         }
 
