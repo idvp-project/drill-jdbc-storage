@@ -91,13 +91,11 @@ class OffsetFetchDelegate {
 
         if (dialect instanceof PostgresqlSqlDialect) {
             dialect.unparseFetchUsingLimit(writer, offset, fetch);
-        }
-
-        if (dialect instanceof VerticaSqlDialect) {
+        } else if (dialect instanceof VerticaSqlDialect) {
             dialect.unparseFetchUsingLimit(writer, offset, fetch);
+        } else {
+            // default behavior
+            dialect.unparseOffsetFetch(writer, offset, fetch);
         }
-
-        // default behavior
-        dialect.unparseOffsetFetch(writer, offset, fetch);
     }
 }
