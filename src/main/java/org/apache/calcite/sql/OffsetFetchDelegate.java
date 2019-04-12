@@ -17,6 +17,7 @@
  */
 package org.apache.calcite.sql;
 
+import org.apache.calcite.sql.dialect.FirebirdSqlDialect;
 import org.apache.calcite.sql.dialect.MssqlSqlDialect;
 import org.apache.calcite.sql.dialect.OracleSqlDialect;
 import org.apache.calcite.sql.dialect.PostgresqlSqlDialect;
@@ -71,6 +72,14 @@ class OffsetFetchDelegate {
             try (Connection connection = dataSource.getConnection()) {
                 DatabaseMetaData metaData = connection.getMetaData();
                 return metaData.getDatabaseMajorVersion() >= 11;
+            }
+        }
+
+        if (dialect instanceof FirebirdSqlDialect) {
+            // FIREBIRD поддерживает OFFSET + FETCH начиная с 3.0 версии
+            try (Connection connection = dataSource.getConnection()) {
+                DatabaseMetaData metaData = connection.getMetaData();
+                return metaData.getDatabaseMajorVersion() >= 3;
             }
         }
 
