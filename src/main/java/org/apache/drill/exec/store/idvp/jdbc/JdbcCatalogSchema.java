@@ -17,7 +17,7 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
-import com.google.common.collect.ImmutableList;
+import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableList;
 import org.apache.calcite.adapter.jdbc.LazyJdbcSchema;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaPlus;

@@ -17,9 +17,10 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
-import com.google.common.base.Charsets;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
+import org.apache.drill.shaded.guava.com.google.common.base.Charsets;
+import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableList;
+import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableMap;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.AutoCloseables;
 import org.apache.drill.common.exceptions.UserException;
@@ -47,7 +48,6 @@ import java.util.*;
 
 public class JdbcRecordReader extends AbstractRecordReader {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JdbcRecordReader.class);
-    private static final TypeValidators.BooleanValidator DECIMAL_ENABLED = new TypeValidators.BooleanValidator("planner.enable_decimal_data_type");
 
     // Эти маппинги должны быть согласованы
     private static final ImmutableMap<Integer, SqlTypeName> DRILL_TYPE_NAMES;
@@ -168,7 +168,7 @@ public class JdbcRecordReader extends AbstractRecordReader {
         this.source = source;
         this.sql = sql;
         this.storagePluginName = storagePluginName;
-        this.decimalEnabled = context.getOptions().getOption(DECIMAL_ENABLED);
+        this.decimalEnabled = context.getOptions().getOption(PlannerSettings.ENABLE_DECIMAL_DATA_TYPE);
     }
 
     private static String nameFromType(int javaSqlType) {

@@ -17,13 +17,10 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
-import org.apache.commons.dbcp.*;
-import org.apache.commons.pool.KeyedObjectPoolFactory;
-import org.apache.commons.pool.impl.GenericObjectPool;
+import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.commons.dbcp2.ConnectionFactory;
 
-import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.List;
 
 /**
  * @author Oleg Zinoviev
@@ -44,75 +41,5 @@ public class JdbcBasicDataSource extends BasicDataSource {
         setTestWhileIdle(testWhileIdle);
 
         return connectionFactory;
-    }
-
-    @Override
-    protected void createPoolableConnectionFactory(ConnectionFactory driverConnectionFactory,
-                                                   KeyedObjectPoolFactory statementPoolFactory,
-                                                   AbandonedConfig configuration) throws SQLException {
-        ConnFactory connectionFactory;
-
-        try {
-            connectionFactory = new ConnFactory(
-                    driverConnectionFactory,
-                    this.connectionPool,
-                    statementPoolFactory,
-                    this.validationQuery,
-                    this.validationQueryTimeout,
-                    this.connectionInitSqls,
-                    this.defaultReadOnly,
-                    this.defaultAutoCommit,
-                    this.defaultTransactionIsolation,
-                    this.defaultCatalog, configuration);
-            validateConnectionFactory(connectionFactory);
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            //noinspection deprecation
-            throw new SQLNestedException("Cannot create PoolableConnectionFactory (" + e.getMessage() + ")", e);
-        }
-    }
-
-    public static class ConnFactory extends PoolableConnectionFactory {
-
-        ConnFactory(ConnectionFactory driverConnectionFactory,
-                    GenericObjectPool connectionPool,
-                    KeyedObjectPoolFactory statementPoolFactory,
-                    String validationQuery,
-                    int validationQueryTimeout,
-                    List connectionInitSqls,
-                    Boolean defaultReadOnly,
-                    boolean defaultAutoCommit,
-                    int defaultTransactionIsolation,
-                    String defaultCatalog,
-                    AbandonedConfig configuration) {
-            super(driverConnectionFactory,
-                    connectionPool,
-                    statementPoolFactory,
-                    validationQuery,
-                    validationQueryTimeout,
-                    connectionInitSqls,
-                    defaultReadOnly,
-                    defaultAutoCommit,
-                    defaultTransactionIsolation,
-                    defaultCatalog,
-                    configuration);
-        }
-
-        @Override
-        public void validateConnection(Connection conn) throws SQLException {
-            if (conn.isClosed()) {
-                throw new SQLException("validateConnection: connection closed");
-            } else {
-                if (this._validationQueryTimeout > 0) {
-                    if (!conn.isValid(this._validationQueryTimeout)) {
-                        throw new SQLException("validateConnection: connection not valid");
-                    }
-                }
-
-                super.validateConnection(conn);
-
-            }
-        }
     }
 }

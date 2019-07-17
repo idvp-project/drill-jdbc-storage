@@ -48,4 +48,5 @@ public class JdbcDrel extends SingleRel implements DrillRel {
     public LogicalOperator implement(DrillImplementor implementor) {
         throw new UnsupportedOperationException();
     }
+
 }

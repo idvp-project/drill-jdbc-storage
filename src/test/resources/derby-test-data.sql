@@ -1,4 +1,6 @@
 
+set global time_zone = "+00:00";
+
 create SCHEMA drill_derby_test;
 set schema drill_derby_test;
 

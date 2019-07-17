@@ -17,10 +17,10 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
-import com.google.common.base.Predicates;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
+import org.apache.drill.shaded.guava.com.google.common.base.Predicates;
+import org.apache.drill.shaded.guava.com.google.common.cache.CacheBuilder;
+import org.apache.drill.shaded.guava.com.google.common.cache.CacheLoader;
+import org.apache.drill.shaded.guava.com.google.common.cache.LoadingCache;
 import org.apache.calcite.adapter.jdbc.JdbcConvention;
 import org.apache.calcite.adapter.jdbc.JdbcRules;
 import org.apache.calcite.plan.*;
@@ -47,7 +47,6 @@ import java.util.concurrent.TimeUnit;
 
 abstract class DrillJdbcRuleBase extends ConverterRule {
 
-    @SuppressWarnings("UnstableApiUsage")
     final LoadingCache<RexNode, Boolean> checkedExpressions = CacheBuilder.newBuilder()
             .maximumSize(1000)
             .expireAfterWrite(10, TimeUnit.MINUTES)
