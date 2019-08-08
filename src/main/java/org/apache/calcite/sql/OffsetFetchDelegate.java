@@ -69,10 +69,14 @@ class OffsetFetchDelegate {
 
         if (dialect instanceof MssqlSqlDialect) {
             // MS SQL поддерживает OFFSET + FETCH начиная с 2012 (11.x) версии
-            try (Connection connection = dataSource.getConnection()) {
-                DatabaseMetaData metaData = connection.getMetaData();
-                return metaData.getDatabaseMajorVersion() >= 11;
-            }
+            // НО: только если в запросе есть сортировка.
+            // Поэтому просто возвращаем false
+            // try (Connection connection = dataSource.getConnection()) {
+            //      DatabaseMetaData metaData = connection.getMetaData();
+            //      return metaData.getDatabaseMajorVersion() >= 11;
+            // }
+
+            return false;
         }
 
         if (dialect instanceof FirebirdSqlDialect) {
