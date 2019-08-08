@@ -18,6 +18,18 @@
 package org.apache.drill.exec.store.idvp.jdbc;
 
 import org.apache.drill.exec.planner.physical.PlannerSettings;
+import org.apache.drill.exec.vector.NullableBigIntVector;
+import org.apache.drill.exec.vector.NullableBitVector;
+import org.apache.drill.exec.vector.NullableDateVector;
+import org.apache.drill.exec.vector.NullableFloat4Vector;
+import org.apache.drill.exec.vector.NullableFloat8Vector;
+import org.apache.drill.exec.vector.NullableIntVector;
+import org.apache.drill.exec.vector.NullableTimeStampVector;
+import org.apache.drill.exec.vector.NullableTimeVector;
+import org.apache.drill.exec.vector.NullableVarBinaryVector;
+import org.apache.drill.exec.vector.NullableVarCharVector;
+import org.apache.drill.exec.vector.NullableVarDecimalVector;
+import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.shaded.guava.com.google.common.base.Charsets;
 import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableList;
 import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableMap;
@@ -34,9 +46,7 @@ import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.MaterializedField;
-import org.apache.drill.exec.server.options.TypeValidators;
 import org.apache.drill.exec.store.AbstractRecordReader;
-import org.apache.drill.exec.vector.*;
 
 import javax.sql.DataSource;
 import java.lang.reflect.Field;
@@ -70,6 +80,7 @@ public class JdbcRecordReader extends AbstractRecordReader {
                 .put(java.sql.Types.NVARCHAR, SqlTypeName.VARCHAR)
                 .put(java.sql.Types.LONGNVARCHAR, SqlTypeName.VARCHAR)
 
+                .put(java.sql.Types.BINARY, SqlTypeName.VARBINARY)
                 .put(java.sql.Types.VARBINARY, SqlTypeName.VARBINARY)
                 .put(java.sql.Types.LONGVARBINARY, SqlTypeName.VARBINARY)
                 .put(java.sql.Types.BLOB, SqlTypeName.VARBINARY)
@@ -117,6 +128,7 @@ public class JdbcRecordReader extends AbstractRecordReader {
                 .put(java.sql.Types.NVARCHAR, new TypeInfo(MinorType.VARCHAR))
                 .put(java.sql.Types.LONGNVARCHAR, new TypeInfo(MinorType.VARCHAR))
 
+                .put(java.sql.Types.BINARY, new TypeInfo(MinorType.VARBINARY))
                 .put(java.sql.Types.VARBINARY, new TypeInfo(MinorType.VARBINARY))
                 .put(java.sql.Types.LONGVARBINARY, new TypeInfo(MinorType.VARBINARY))
                 .put(java.sql.Types.BLOB, new TypeInfo(MinorType.VARBINARY))
@@ -344,11 +356,12 @@ public class JdbcRecordReader extends AbstractRecordReader {
                     .build(logger);
         }
 
+        counter = Math.max(counter, 0);
         for (ValueVector vv : vectors) {
-            vv.getMutator().setValueCount(counter > 0 ? counter : 0);
+            vv.getMutator().setValueCount(counter);
         }
 
-        return counter > 0 ? counter : 0;
+        return counter;
     }
 
     @Override
