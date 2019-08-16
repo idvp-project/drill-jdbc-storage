@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
+import org.apache.calcite.schema.Function;
 import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableList;
 import org.apache.calcite.adapter.jdbc.LazyJdbcSchema;
 import org.apache.calcite.schema.Schema;
@@ -24,6 +25,8 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.Table;
 import org.apache.drill.exec.store.AbstractSchema;
 
+import java.util.Collection;
+import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -64,6 +67,16 @@ class JdbcCatalogSchema extends AbstractSchema {
         }
 
         return null;
+    }
+
+    @Override
+    public Set<String> getFunctionNames() {
+        return getRootSchema().getFunctionNames();
+    }
+
+    @Override
+    public Collection<Function> getFunctions(String name) {
+        return super.getFunctions(name);
     }
 
     @Override

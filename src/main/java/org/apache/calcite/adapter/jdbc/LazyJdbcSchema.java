@@ -17,12 +17,14 @@
  */
 package org.apache.calcite.adapter.jdbc;
 
+import com.google.common.collect.Multimap;
 import org.apache.calcite.avatica.SqlType;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeImpl;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rel.type.RelProtoDataType;
+import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.Table;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
@@ -32,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.drill.exec.store.idvp.jdbc.JdbcRecordReader;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -41,6 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class LazyJdbcSchema extends JdbcSchema {
 
     private final Map<String, Table> tables = new ConcurrentHashMap<>();
+
     private final String catalog;
     private final String schema;
 
@@ -48,6 +52,11 @@ public class LazyJdbcSchema extends JdbcSchema {
         super(dataSource, dialect, convention, catalog, schema);
         this.catalog = catalog;
         this.schema = schema;
+    }
+
+    @Override
+    protected Multimap<String, Function> getFunctions() {
+
     }
 
     @Override
