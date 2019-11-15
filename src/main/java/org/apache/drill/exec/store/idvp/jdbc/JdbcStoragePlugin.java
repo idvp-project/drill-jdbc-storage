@@ -124,7 +124,7 @@ public class JdbcStoragePlugin extends AbstractStoragePlugin {
                     if (!config.isUseStandardDialect()) {
                         try (Connection connection = getSource().getConnection()) {
                             this.dialect = JdbcSqlDialect.createDialect(connection.getMetaData(), getSource());
-                        } catch (SQLException e) {
+                        } catch (Exception e) {
                             this.dialect = JdbcSqlDialect.createByDriverName(getConfig().getDriver(), getSource());
                         }
                     } else {

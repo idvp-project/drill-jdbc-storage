@@ -20,6 +20,7 @@ package org.apache.calcite.sql;
 import org.apache.calcite.config.NullCollation;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.sql.clickhouse.ClickHouseSqlDialect;
 import org.apache.calcite.sql.dialect.AnsiSqlDialect;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableSortedMap;
@@ -30,6 +31,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * @author Oleg Zinoviev
@@ -66,13 +68,23 @@ public class JdbcSqlDialect extends SqlDialect {
             .put("com.amazon.redshift.jdbc4.Driver", DatabaseProduct.REDSHIFT)
             .build();
 
-    public static JdbcSqlDialect createDialect(DatabaseMetaData databaseMetaData, DataSource dataSource) {
+    public static JdbcSqlDialect createDialect(DatabaseMetaData databaseMetaData, DataSource dataSource) throws Exception {
+        // Костыль для поддержки clickhouse
+        if (Objects.equals(databaseMetaData.getDriverName(), "ru.yandex.clickhouse.ClickHouseDriver")) {
+            return new JdbcSqlDialect(ClickHouseSqlDialect.DEFAULT, dataSource);
+        }
+
         SqlDialectFactory factory = new SqlDialectFactoryImpl();
         SqlDialect sqlDialect = factory.create(databaseMetaData);
         return new JdbcSqlDialect(sqlDialect, dataSource);
     }
 
     public static JdbcSqlDialect createByDriverName(String driver, DataSource dataSource) {
+        // Костыль для поддержки clickhouse
+        if (Objects.equals(driver, "ru.yandex.clickhouse.ClickHouseDriver")) {
+            return new JdbcSqlDialect(ClickHouseSqlDialect.DEFAULT, dataSource);
+        }
+
         DatabaseProduct product = DRIVERS_MAP.get(driver);
         if (product == null) {
             return new JdbcSqlDialect(AnsiSqlDialect.DEFAULT, dataSource);
