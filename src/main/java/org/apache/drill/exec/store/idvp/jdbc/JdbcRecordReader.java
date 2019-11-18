@@ -533,6 +533,7 @@ public class JdbcRecordReader extends AbstractRecordReader {
 
     private static class DateCopier extends Copier<NullableDateVector.Mutator> {
 
+        private volatile boolean supportsCalendar = true;
         private final Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
         DateCopier(int columnIndex, ResultSet result, NullableDateVector.Mutator mutator) {
@@ -541,16 +542,30 @@ public class JdbcRecordReader extends AbstractRecordReader {
 
         @Override
         void copy(int index) throws SQLException {
-            Date date = result.getDate(columnIndex, calendar);
+            Date date = null;
+            if (supportsCalendar) {
+                try {
+                    date = result.getDate(columnIndex, calendar);
+                } catch (UnsupportedOperationException e) {
+                    supportsCalendar = false;
+                }
+            }
+
+            if (!supportsCalendar) {
+                date = result.getDate(columnIndex);
+            }
+
             if (date != null) {
                 mutator.setSafe(index, date.getTime());
             }
+
         }
 
     }
 
     private static class TimeCopier extends Copier<NullableTimeVector.Mutator> {
 
+        private volatile boolean supportsCalendar = true;
         private final Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
         TimeCopier(int columnIndex, ResultSet result, NullableTimeVector.Mutator mutator) {
@@ -559,7 +574,19 @@ public class JdbcRecordReader extends AbstractRecordReader {
 
         @Override
         void copy(int index) throws SQLException {
-            Time time = result.getTime(columnIndex, calendar);
+            Time time = null;
+            if (supportsCalendar) {
+                try {
+                    time = result.getTime(columnIndex, calendar);
+                } catch (UnsupportedOperationException e) {
+                    supportsCalendar = false;
+                }
+            }
+
+            if (!supportsCalendar) {
+                time = result.getTime(columnIndex);
+            }
+
             if (time != null) {
                 mutator.setSafe(index, (int) time.getTime());
             }
@@ -571,6 +598,7 @@ public class JdbcRecordReader extends AbstractRecordReader {
 
     private static class TimeStampCopier extends Copier<NullableTimeStampVector.Mutator> {
 
+        private volatile boolean supportsCalendar = true;
         private final Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 
         TimeStampCopier(int columnIndex, ResultSet result, NullableTimeStampVector.Mutator mutator) {
@@ -579,14 +607,25 @@ public class JdbcRecordReader extends AbstractRecordReader {
 
         @Override
         void copy(int index) throws SQLException {
-            Timestamp stamp = result.getTimestamp(columnIndex, calendar);
+            Timestamp stamp = null;
+            if (supportsCalendar) {
+                try {
+                    stamp = result.getTimestamp(columnIndex, calendar);
+                } catch (UnsupportedOperationException e) {
+                    supportsCalendar = false;
+                }
+            }
+
+            if (!supportsCalendar) {
+                stamp = result.getTimestamp(columnIndex);
+            }
+
             if (stamp != null) {
                 mutator.setSafe(index, stamp.getTime());
             }
-
         }
-
     }
+
 
     private static class BitCopier extends Copier<NullableBitVector.Mutator> {
 

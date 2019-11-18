@@ -70,7 +70,7 @@ public class JdbcSqlDialect extends SqlDialect {
 
     public static JdbcSqlDialect createDialect(DatabaseMetaData databaseMetaData, DataSource dataSource) throws Exception {
         // Костыль для поддержки clickhouse
-        if (Objects.equals(databaseMetaData.getDriverName(), "ru.yandex.clickhouse.ClickHouseDriver")) {
+        if (Objects.equals(databaseMetaData.getDriverName(), "ru.yandex.clickhouse-jdbc")) {
             return new JdbcSqlDialect(ClickHouseSqlDialect.DEFAULT, dataSource);
         }
 
