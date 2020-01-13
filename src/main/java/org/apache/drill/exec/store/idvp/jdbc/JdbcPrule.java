@@ -31,7 +31,6 @@ import org.apache.drill.exec.planner.physical.Prel;
 public class JdbcPrule extends ConverterRule {
 
     JdbcPrule() {
-        //noinspection Guava
         super(JdbcDrel.class, Predicates.alwaysTrue(),
                 DrillRel.DRILL_LOGICAL,
                 Prel.DRILL_PHYSICAL,

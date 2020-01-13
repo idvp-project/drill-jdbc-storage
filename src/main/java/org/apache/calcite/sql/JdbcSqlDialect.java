@@ -25,6 +25,7 @@ import org.apache.calcite.sql.dialect.AnsiSqlDialect;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableSortedMap;
 
+import javax.annotation.Nonnull;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.sql.DatabaseMetaData;
@@ -109,7 +110,6 @@ public class JdbcSqlDialect extends SqlDialect {
         this.dataSource = dataSource;
     }
 
-    @Override
     public boolean identifierNeedsToBeQuoted(String val) {
         createIdentifierValidator();
         return validator.identifierNeedsToBeQuoted(val);
@@ -238,6 +238,7 @@ public class JdbcSqlDialect extends SqlDialect {
         return dialect.getNullCollation();
     }
 
+    @Nonnull
     @Override
     public RelFieldCollation.NullDirection defaultNullDirection(RelFieldCollation.Direction direction) {
         return dialect.defaultNullDirection(direction);

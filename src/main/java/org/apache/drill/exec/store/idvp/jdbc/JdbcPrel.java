@@ -57,7 +57,6 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
     JdbcPrel(RelOptCluster cluster, RelTraitSet traitSet, JdbcIntermediatePrel prel) {
         super(cluster, traitSet);
         final RelNode input = prel.getInput();
-        //noinspection deprecation
         rows = input.estimateRowCount(cluster.getMetadataQuery());
         rowType = input.getRowType();
         convention = (DrillJdbcConvention) input.getTraitSet().getTrait(ConventionTraitDef.INSTANCE);
@@ -158,7 +157,7 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
         return false;
     }
 
-    private class SubsetRemover extends RelShuttleImpl {
+    private static class SubsetRemover extends RelShuttleImpl {
 
         @Override
         public RelNode visit(RelNode other) {
@@ -170,7 +169,7 @@ public class JdbcPrel extends AbstractRelNode implements Prel {
         }
     }
 
-    private class AliasShuttle extends SqlShuttle {
+    private static class AliasShuttle extends SqlShuttle {
         private int index = -1;
         private final Function<Integer, String> aliasGenerator;
 

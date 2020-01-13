@@ -17,11 +17,15 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
-import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JacksonInject;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.physical.base.AbstractSubScan;
-import org.apache.drill.exec.proto.beans.CoreOperatorType;
+import org.apache.drill.exec.proto.UserBitShared;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 
 @JsonTypeName("jdbc-idvp-sub-scan")
@@ -48,7 +52,7 @@ public class JdbcSubScan extends AbstractSubScan {
 
     @Override
     public int getOperatorType() {
-        return CoreOperatorType.JDBC_SCAN.getNumber();
+        return UserBitShared.CoreOperatorType.JDBC_SCAN.getNumber();
     }
 
     @JsonProperty

@@ -17,7 +17,6 @@
  */
 package org.apache.drill.exec.store.idvp.jdbc;
 
-import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableSet;
 import org.apache.calcite.adapter.jdbc.JdbcConvention;
 import org.apache.calcite.adapter.jdbc.JdbcRules;
 import org.apache.calcite.linq4j.tree.ConstantUntypedNull;
@@ -25,6 +24,7 @@ import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.sql.SqlDialect;
 import org.apache.drill.exec.planner.RuleInstance;
+import org.apache.drill.shaded.guava.com.google.common.collect.ImmutableSet;
 
 import java.util.Set;
 
@@ -55,8 +55,7 @@ public class DrillJdbcConvention extends JdbcConvention {
         builder.add(new JdbcDrelConverterRule(this));
         builder.add(new DrillJdbcRuleBase.DrillJdbcProjectRule(this));
         builder.add(new DrillJdbcRuleBase.DrillJdbcFilterRule(this));
-        // TODO: uncomment in Drill 17
-        // builder.add(new DrillJdbcRuleBase.DrillJdbcSortRule(this));
+        builder.add(new DrillJdbcRuleBase.DrillJdbcSortRule(this));
 
         if (plugin.getConfig().isUseExtendedAggregatePushDown()) {
             builder.add(new DrillJdbcRuleBase.DrillJdbcAggregateRule(this));
