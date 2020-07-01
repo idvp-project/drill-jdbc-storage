@@ -29,7 +29,7 @@
     <name>drill-idvp-jdbc-storage</name>
 
     <properties>
-        <mysql.connector.version>8.0.13</mysql.connector.version>
+        <mysql.connector.version>8.0.16</mysql.connector.version>
         <derby.database.name>drill_derby_test</derby.database.name>
         <mysql.database.name>drill_mysql_test</mysql.database.name>
         <mysql.scriptFile.name>mysql-test-data.sql</mysql.scriptFile.name>
